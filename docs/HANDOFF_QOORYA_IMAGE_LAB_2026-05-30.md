@@ -193,6 +193,47 @@ Pipeline autonome :
 7. Correction appliquee : le pipeline genere caption + hashtags avant publication si ces champs sont manquants.
 8. Correction appliquee : le pipeline accepte les statuts normalises et certains anciens statuts techniques comme `DONE_CAROUSEL`.
 
+## Archivage GitHub de fin de session
+
+Un nouveau depot GitHub separe a ete cree pour ne pas modifier le projet existant qui fonctionne deja.
+
+Depot GitHub :
+
+```text
+https://github.com/qooryacontact-cloud/qoorya-image-lab-autopublisher
+```
+
+Depot local :
+
+```text
+C:\Users\Pierre\Documents\qoorya-image-lab-autopublisher
+```
+
+Etat Git :
+
+```text
+commit c8e75ca init: scaffold qoorya image lab autopublisher
+remote origin https://github.com/qooryacontact-cloud/qoorya-image-lab-autopublisher.git
+branche master poussee sur origin/master
+```
+
+Contenu pousse :
+
+- README du nouveau projet ;
+- `.gitignore` ;
+- `appsscript.json` ;
+- `.clasp.example.json` ;
+- docs de handoff et workflow.
+
+Important : le nouveau depot ne contient pas encore le code Apps Script complet actuel. Il contient le scaffold et les documents de reprise. Pour importer le vrai script, il faudra recuperer l'ID du projet Apps Script QOORYA_IMAGE_LAB, creer le fichier `.clasp.json`, puis lancer `clasp.cmd pull` dans le nouveau depot.
+
+Ne pas pousser ni modifier l'ancien depot :
+
+```text
+C:\Users\Pierre\Documents\mon-script-sheets
+https://github.com/qooryacontact-cloud/autoInstaPublication.git
+```
+
 ## Point de vigilance
 
 Ne pas installer le declencheur autonome tant que le rythme de publication n'est pas decide.
@@ -219,9 +260,10 @@ Decider le mode beta de publication :
 2. ou declencheur toutes les 15 minutes mais avec seulement quelques lignes eligibles ;
 3. definir le rythme editorial, par exemple 2 ou 3 publications par semaine ;
 4. choisir si la date de publication doit etre ajoutee comme colonne avant d'activer l'autonomie continue.
+5. importer le code Apps Script actuel dans le nouveau depot GitHub separe quand le `scriptId` QOORYA_IMAGE_LAB est disponible.
 
 ## Phrase de reprise conseillee
 
 ```text
-Reprends QOORYA_IMAGE_LAB depuis le handoff local du 2026-05-30. Le pipeline image -> caption/hashtags -> Cloudinary -> Instagram est valide pour post simple et carrousel 3 slides. Ne touche pas au moteur image. Priorite : securiser le mode beta de publication autonome, definir le rythme, puis decider si on installe le declencheur.
+Reprends QOORYA_IMAGE_LAB depuis le handoff local du 2026-05-30. Le pipeline image -> caption/hashtags -> Cloudinary -> Instagram est valide pour post simple et carrousel 3 slides. Ne touche pas au moteur image. Un nouveau repo separe existe : https://github.com/qooryacontact-cloud/qoorya-image-lab-autopublisher. Priorite : importer proprement le code Apps Script actuel dans ce repo, securiser le mode beta de publication autonome, definir le rythme, puis decider si on installe le declencheur.
 ```

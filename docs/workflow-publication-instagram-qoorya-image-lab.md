@@ -171,3 +171,31 @@ Point de vigilance :
 - ne pas installer le declencheur autonome tant que le rythme de publication n'est pas decide ;
 - garder `AUTONOMOUS_PUBLISHING_ENABLED = YES` seulement si l'on accepte que le pipeline publie vraiment ;
 - utiliser le pipeline par numero de ligne pendant la beta.
+
+## Journal - fin de session 2026-05-30
+
+Le pipeline de publication autonome QOORYA_IMAGE_LAB est valide en beta :
+
+`image V1` -> `caption + hashtags` -> `Cloudinary` -> `Instagram Graph API` -> `PUBLISHED`
+
+Un nouveau depot GitHub separe a ete cree et pousse pour preparer la V3 sans toucher a l'ancien projet fonctionnel :
+
+```text
+https://github.com/qooryacontact-cloud/qoorya-image-lab-autopublisher
+```
+
+Depot local :
+
+```text
+C:\Users\Pierre\Documents\qoorya-image-lab-autopublisher
+```
+
+Commit pousse :
+
+```text
+c8e75ca init: scaffold qoorya image lab autopublisher
+```
+
+Le depot contient le scaffold et les documents de reprise, mais pas encore le code Apps Script complet actuel. Prochaine action technique : recuperer le `scriptId` du projet Apps Script QOORYA_IMAGE_LAB, creer `.clasp.json` depuis `.clasp.example.json`, faire `clasp.cmd pull`, verifier que le code importe bien les fonctions du pipeline autonome, puis commit/push dans ce nouveau depot.
+
+L'ancien depot `autoInstaPublication` ne doit pas etre modifie pour cette V3.
