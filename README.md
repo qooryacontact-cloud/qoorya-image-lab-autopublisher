@@ -32,6 +32,18 @@ Tests valides :
 - `docs/HANDOFF_QOORYA_IMAGE_LAB_2026-05-30.md` : etat complet de reprise.
 - `docs/workflow-publication-instagram-qoorya-image-lab.md` : workflow de publication.
 
+## Etat du repo
+
+Code Apps Script importe via `clasp pull` depuis le projet Apps Script lie a la Sheet `QOORYA_IMAGE_LAB`.
+
+Verification effectuee :
+
+- moteur image conserve : `gpt-image-2`, format `1088x1360` ;
+- onglet cible : `Image Lab` ;
+- pipeline present : image -> caption/hashtags -> Cloudinary -> Instagram ;
+- publication beta validee cote Sheet pour post simple et carrousel 3 slides ;
+- `.clasp.json` reste ignore par Git.
+
 ## Mise en route
 
 1. Copier `.clasp.example.json` en `.clasp.json`.
@@ -80,3 +92,17 @@ AUTONOMOUS_PUBLISHING_ENABLED = YES
 Ne pas installer le declencheur autonome tant que le rythme de publication beta n'est pas decide.
 
 Pendant la beta, utiliser le pipeline par numero de ligne.
+
+Le code protege maintenant l'installation du declencheur : `installAutonomousPipelineTrigger` refuse d'installer le trigger tant que la propriete suivante n'est pas definie :
+
+```text
+AUTONOMOUS_TRIGGER_INSTALL_ALLOWED = YES
+```
+
+Publication autonome effective seulement si :
+
+```text
+AUTONOMOUS_PUBLISHING_ENABLED = YES
+```
+
+Rythme beta recommande avant declencheur : 2 publications par semaine, avec selection humaine des lignes eligibles et controle manuel de la Sheet avant activation.

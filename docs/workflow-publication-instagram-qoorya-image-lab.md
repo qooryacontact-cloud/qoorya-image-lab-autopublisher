@@ -172,6 +172,39 @@ Point de vigilance :
 - garder `AUTONOMOUS_PUBLISHING_ENABLED = YES` seulement si l'on accepte que le pipeline publie vraiment ;
 - utiliser le pipeline par numero de ligne pendant la beta.
 
+## Securite beta ajoutee
+
+Le mode beta doit rester volontaire et controle.
+
+Le pipeline par numero de ligne respecte maintenant la propriete :
+
+```text
+AUTONOMOUS_PUBLISHING_ENABLED = YES
+```
+
+Si cette propriete n'est pas `YES`, le pipeline prepare la ligne jusqu'a `READY FOR INSTAGRAM`, puis s'arrete avant publication.
+
+L'installation du declencheur automatique est protegee par une propriete supplementaire :
+
+```text
+AUTONOMOUS_TRIGGER_INSTALL_ALLOWED = YES
+```
+
+Sans cette propriete, `installAutonomousPipelineTrigger` refuse d'installer le declencheur.
+
+## Rythme beta recommande
+
+Ne pas installer de declencheur tant que le rythme editorial n'est pas valide.
+
+Cadence proposee pour la beta :
+
+- 2 publications par semaine ;
+- controle humain des lignes candidates avant publication ;
+- lancement manuel par numero de ligne pendant la premiere semaine ;
+- declencheur seulement apres validation du rythme et des lignes eligibles.
+
+Si un declencheur est active plus tard, garder une cadence technique prudente : une execution toutes les 15 minutes, avec peu de lignes eligibles dans la Sheet, afin d'eviter une publication en rafale.
+
 ## Journal - fin de session 2026-05-30
 
 Le pipeline de publication autonome QOORYA_IMAGE_LAB est valide en beta :
@@ -196,6 +229,6 @@ Commit pousse :
 c8e75ca init: scaffold qoorya image lab autopublisher
 ```
 
-Le depot contient le scaffold et les documents de reprise, mais pas encore le code Apps Script complet actuel. Prochaine action technique : recuperer le `scriptId` du projet Apps Script QOORYA_IMAGE_LAB, creer `.clasp.json` depuis `.clasp.example.json`, faire `clasp.cmd pull`, verifier que le code importe bien les fonctions du pipeline autonome, puis commit/push dans ce nouveau depot.
+Le code Apps Script complet actuel a ete importe dans le nouveau depot via `clasp.cmd pull`. `.clasp.json` reste local et ignore par Git.
 
 L'ancien depot `autoInstaPublication` ne doit pas etre modifie pour cette V3.
