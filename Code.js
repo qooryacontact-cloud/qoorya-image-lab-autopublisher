@@ -85,6 +85,7 @@ function onOpen() {
     .addSeparator()
     .addItem('Pipeline autonome par numero de ligne', 'runAutonomousPipelineByNumber')
     .addItem('Executer prochaine ligne autonome', 'runNextAutonomousPipelineStep')
+    .addItem('Diagnostiquer securite beta', 'showAutonomousPublishingBetaStatus')
     .addItem('Installer declencheur pipeline autonome', 'installAutonomousPipelineTrigger')
     .addItem('Arreter declencheur pipeline autonome', 'stopAutonomousPipelineTrigger')
     .addToUi();
@@ -2160,4 +2161,35 @@ function stopAutonomousPipelineTrigger() {
       ScriptApp.deleteTrigger(trigger);
     }
   });
+}
+
+function showAutonomousPublishingBetaStatus() {
+  SpreadsheetApp.getUi().alert(
+    'Securite beta',
+    getAutonomousPublishingBetaStatus_(),
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+function diagnoseAutonomousPublishingBetaStatus() {
+  const status = getAutonomousPublishingBetaStatus_();
+  Logger.log(status);
+  return status;
+}
+
+function getAutonomousPublishingBetaStatus_() {
+  const publishEnabled = getOptionalScriptProperty_('AUTONOMOUS_PUBLISHING_ENABLED') === 'YES';
+  const triggerInstallAllowed = getOptionalScriptProperty_('AUTONOMOUS_TRIGGER_INSTALL_ALLOWED') === 'YES';
+  const triggers = ScriptApp.getProjectTriggers();
+  const autonomousTriggers = triggers.filter(function(trigger) {
+    return trigger.getHandlerFunction() === 'runNextAutonomousPipelineStep';
+  });
+
+  return [
+    'Publication autonome : ' + (publishEnabled ? 'ACTIVE' : 'DESACTIVEE'),
+    'Installation declencheur autorisee : ' + (triggerInstallAllowed ? 'OUI' : 'NON'),
+    'Declencheurs runNextAutonomousPipelineStep installes : ' + autonomousTriggers.length,
+    '',
+    'Mode beta recommande : publication manuelle par numero de ligne, sans declencheur automatique.'
+  ].join('\n');
 }

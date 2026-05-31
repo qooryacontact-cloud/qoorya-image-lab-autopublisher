@@ -93,6 +93,12 @@ Ne pas installer le declencheur autonome tant que le rythme de publication beta 
 
 Pendant la beta, utiliser le pipeline par numero de ligne.
 
+Diagnostic sans publication :
+
+```text
+QOORYA Image Lab > Diagnostiquer securite beta
+```
+
 Le code protege maintenant l'installation du declencheur : `installAutonomousPipelineTrigger` refuse d'installer le trigger tant que la propriete suivante n'est pas definie :
 
 ```text

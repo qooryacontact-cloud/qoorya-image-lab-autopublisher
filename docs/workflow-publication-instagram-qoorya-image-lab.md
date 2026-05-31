@@ -192,6 +192,14 @@ AUTONOMOUS_TRIGGER_INSTALL_ALLOWED = YES
 
 Sans cette propriete, `installAutonomousPipelineTrigger` refuse d'installer le declencheur.
 
+Diagnostic sans effet de bord :
+
+```text
+QOORYA Image Lab > Diagnostiquer securite beta
+```
+
+Ce diagnostic affiche l'etat de `AUTONOMOUS_PUBLISHING_ENABLED`, l'autorisation d'installation du declencheur, et le nombre de declencheurs `runNextAutonomousPipelineStep` installes.
+
 ## Rythme beta recommande
 
 Ne pas installer de declencheur tant que le rythme editorial n'est pas valide.
