@@ -123,6 +123,6 @@ Heure quotidienne optionnelle :
 AUTONOMOUS_TRIGGER_HOUR = 9
 ```
 
-Le declencheur automatique execute `runNextAutonomousPipelineStep` une fois par jour. Avant de chercher une ligne a publier, il normalise les statuts des lignes 7 a 50, puis ne traite que la premiere ligne eligible dont la colonne `Date` est aujourd'hui ou deja passee.
+Le declencheur automatique execute `runNextAutonomousPipelineStep` une fois par jour. Avant de chercher une ligne a publier, il normalise les statuts depuis la ligne 7 jusqu'a la derniere ligne utilisee, puis ne traite que la premiere ligne eligible dont la colonne `Date` est aujourd'hui ou deja passee.
 
 Rythme beta recommande avant declencheur : 2 publications par semaine, avec selection humaine des lignes eligibles et controle manuel de la Sheet avant activation.

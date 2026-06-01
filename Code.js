@@ -89,7 +89,7 @@ function onOpen() {
     .addItem('Installer declencheur pipeline autonome', 'installAutonomousPipelineTrigger')
     .addItem('Arreter declencheur pipeline autonome', 'stopAutonomousPipelineTrigger')
     .addSeparator()
-    .addItem('Normaliser statuts lignes 7-50', 'normalizePublicationStatusesRows7To50')
+    .addItem('Normaliser statuts depuis ligne 7', 'normalizePublicationStatusesFromRow7')
     .addToUi();
 }
 
@@ -1963,7 +1963,7 @@ function runAutonomousPipelineByNumber() {
 function runNextAutonomousPipelineStep() {
   const sheet = getImageLabSheet_();
 
-  normalizePublicationStatusesForRows_(7, 50);
+  normalizePublicationStatusesFromRow7ToLastRow_();
 
   const row = findNextAutonomousPipelineRow_(sheet);
 
@@ -2245,7 +2245,7 @@ function getAutonomousPublishingBetaStatus_() {
     'Installation declencheur autorisee : ' + (triggerInstallAllowed ? 'OUI' : 'NON'),
     'Declencheurs runNextAutonomousPipelineStep installes : ' + autonomousTriggers.length,
     'Heure du declencheur quotidien : ' + triggerHour + 'h',
-    'Normalisation automatique avant publication : lignes 7-50',
+    'Normalisation automatique avant publication : ligne 7 jusqu a la derniere ligne utilisee',
     'Prochaine ligne eligible avec date echue : ' + (nextDueRow || 'aucune'),
     '',
     'Regle automatique : publier seulement les lignes eligibles dont la Date est aujourd hui ou passee.'
@@ -2261,14 +2261,32 @@ function getAutonomousPipelineTriggerHour_() {
   return Math.floor(hour);
 }
 
-function normalizePublicationStatusesRows7To50() {
-  const result = normalizePublicationStatusesForRows_(7, 50);
+function normalizePublicationStatusesFromRow7() {
+  const result = normalizePublicationStatusesFromRow7ToLastRow_();
 
   SpreadsheetApp.getUi().alert(
     'Statuts normalises',
     result.updated + ' ligne(s) mise(s) a jour.\n\n' + result.summary.join('\n'),
     SpreadsheetApp.getUi().ButtonSet.OK
   );
+}
+
+function normalizePublicationStatusesRows7To50() {
+  normalizePublicationStatusesFromRow7();
+}
+
+function normalizePublicationStatusesFromRow7ToLastRow_() {
+  const sheet = getImageLabSheet_();
+  const lastRow = sheet.getLastRow();
+
+  if (lastRow < 7) {
+    return {
+      updated: 0,
+      summary: ['Aucune ligne a normaliser.'],
+    };
+  }
+
+  return normalizePublicationStatusesForRows_(7, lastRow);
 }
 
 function normalizePublicationStatusesForRows_(firstRow, lastRow) {
