@@ -1456,6 +1456,7 @@ function getQOORYAPublishingColumns_() {
   const cols = QOORYA_CONFIG.COLUMNS || {};
 
   return {
+    DATE: cols.DATE || 1,
     TYPE: cols.TYPE || 2,
     SUJET: cols.SUJET || 4,
     LEGENDE: cols.LEGENDE || 8,
