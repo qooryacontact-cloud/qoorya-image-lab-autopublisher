@@ -126,3 +126,20 @@ AUTONOMOUS_TRIGGER_HOUR = 9
 Le declencheur automatique execute `runNextAutonomousPipelineStep` une fois par jour. Avant de chercher une ligne a publier, il normalise les statuts depuis la ligne 7 jusqu'a la derniere ligne utilisee, puis ne traite que la premiere ligne eligible dont la colonne `Date` est aujourd'hui ou deja passee.
 
 Rythme beta recommande avant declencheur : 2 publications par semaine, avec selection humaine des lignes eligibles et controle manuel de la Sheet avant activation.
+
+## Programmation trimestrielle
+
+Menu `QOORYA Image Lab` :
+
+- `Installer workflow trimestriel` cree l'onglet `Programmation trimestre` et le document de mode d'emploi.
+- `Creer onglet programmation trimestre` prepare l'onglet de saisie pour les 24 publications du trimestre.
+- `Importer programmation trimestre` importe les lignes validees vers `Image Lab`.
+- `Creer doc workflow trimestriel` cree le document recapitulatif dans Drive.
+
+L'onglet `Programmation trimestre` attend ces colonnes :
+
+```text
+Date de publication | Sujet | Angle editorial | Type de publication | Mise en scene des visuels | Direction visuelle | Nb slides | Intention de legende | Notes / contraintes
+```
+
+L'import ecrit uniquement les valeurs dans `Image Lab`, apres la derniere ligne utile. Il ne supprime pas de lignes et ne modifie pas les formats, validations ou mises en forme conditionnelles.

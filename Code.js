@@ -21,6 +21,25 @@ const QOORYA_CONFIG = {
   },
 };
 
+const QOORYA_QUARTERLY = {
+  SHEET_NAME: 'Programmation trimestre',
+  LAB_FIRST_DATA_ROW: 7,
+  DOC_TITLE: 'QOORYA_IMAGE_LAB - Mode d emploi et programmation trimestrielle',
+  DRIVE_PARENT_FOLDER_NAME: 'qoorya com',
+  DRIVE_FOLDER_NAME: 'Insta',
+  HEADERS: [
+    'Date de publication',
+    'Sujet',
+    'Angle editorial',
+    'Type de publication',
+    'Mise en scene des visuels',
+    'Direction visuelle',
+    'Nb slides',
+    'Intention de legende',
+    'Notes / contraintes',
+  ],
+};
+
 const QOORYA_VISUAL_DIRECTIONS = {
   Libre:
     'Free visual direction. Choose the strongest visual format, composition, objects, framing, and text placement for the subject.',
@@ -90,6 +109,11 @@ function onOpen() {
     .addItem('Arreter declencheur pipeline autonome', 'stopAutonomousPipelineTrigger')
     .addSeparator()
     .addItem('Normaliser statuts depuis ligne 7', 'normalizePublicationStatusesFromRow7')
+    .addSeparator()
+    .addItem('Installer workflow trimestriel', 'setupQuarterlyWorkflow')
+    .addItem('Creer onglet programmation trimestre', 'setupQuarterlyProgrammingSheet')
+    .addItem('Importer programmation trimestre', 'importQuarterlyProgramming')
+    .addItem('Creer doc workflow trimestriel', 'createQuarterlyWorkflowDocument')
     .addToUi();
 }
 
@@ -2356,4 +2380,318 @@ function getPublicationStatusForRowState_(rowValues, c) {
   }
 
   return 'TODO';
+}
+
+function setupQuarterlyWorkflow() {
+  const sheetResult = setupQuarterlyProgrammingSheet_();
+  const docResult = createQuarterlyWorkflowDocument_();
+  const message = [
+    sheetResult,
+    docResult.message,
+  ].join('\n\n');
+
+  SpreadsheetApp.getUi().alert('Workflow trimestriel installe', message, SpreadsheetApp.getUi().ButtonSet.OK);
+
+  return {
+    sheet: sheetResult,
+    documentUrl: docResult.url,
+  };
+}
+
+function setupQuarterlyProgrammingSheet() {
+  SpreadsheetApp.getUi().alert(
+    'Programmation trimestre',
+    setupQuarterlyProgrammingSheet_(),
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+function setupQuarterlyProgrammingSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(QOORYA_QUARTERLY.SHEET_NAME);
+
+  if (!sheet) {
+    sheet = ss.insertSheet(QOORYA_QUARTERLY.SHEET_NAME);
+  }
+
+  sheet.getRange(1, 1, 1, QOORYA_QUARTERLY.HEADERS.length).setValues([QOORYA_QUARTERLY.HEADERS]);
+  sheet.setFrozenRows(1);
+  sheet.getRange(1, 1, 1, QOORYA_QUARTERLY.HEADERS.length)
+    .setFontWeight('bold')
+    .setBackground('#3b2638')
+    .setFontColor('#ffffff');
+  sheet.autoResizeColumns(1, QOORYA_QUARTERLY.HEADERS.length);
+
+  return 'Onglet "' + QOORYA_QUARTERLY.SHEET_NAME + '" pret. Colle les 24 lignes ChatGPT a partir de la ligne 2.';
+}
+
+function importQuarterlyProgramming() {
+  const result = importQuarterlyProgramming_();
+
+  SpreadsheetApp.getUi().alert(
+    'Import programmation trimestre',
+    result.message,
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+
+  return result;
+}
+
+function importQuarterlyProgramming_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const source = ss.getSheetByName(QOORYA_QUARTERLY.SHEET_NAME);
+  const target = getImageLabSheet_();
+
+  if (!source) {
+    throw new Error('Onglet "' + QOORYA_QUARTERLY.SHEET_NAME + '" introuvable. Lance d abord "Creer onglet programmation trimestre".');
+  }
+
+  const lastRow = source.getLastRow();
+  const lastColumn = source.getLastColumn();
+
+  if (lastRow < 2) {
+    throw new Error('Aucune ligne a importer dans "' + QOORYA_QUARTERLY.SHEET_NAME + '".');
+  }
+
+  const values = source.getRange(1, 1, lastRow, lastColumn).getValues();
+  const headerMap = buildQuarterlyHeaderMap_(values[0]);
+  const importedRows = [];
+  const issues = [];
+
+  values.slice(1).forEach(function(rowValues, index) {
+    const sourceRow = index + 2;
+    if (isQuarterlyImportRowBlank_(rowValues)) return;
+
+    const row = buildImageLabRowFromQuarterlyRow_(rowValues, headerMap);
+    const rowIssues = validateQuarterlyImportRow_(row, sourceRow);
+
+    if (rowIssues.length) {
+      issues.push.apply(issues, rowIssues);
+      return;
+    }
+
+    importedRows.push(row);
+  });
+
+  if (issues.length) {
+    throw new Error('Import annule. Corrige ces points :\n- ' + issues.join('\n- '));
+  }
+
+  if (!importedRows.length) {
+    throw new Error('Aucune ligne complete a importer.');
+  }
+
+  const startRow = findFirstWritableImageLabRow_(target);
+  const width = Math.max(QOORYA_CONFIG.COLUMNS.NOTES, QOORYA_CONFIG.COLUMNS.STATUT);
+
+  target.getRange(startRow, 1, importedRows.length, width).clearContent();
+  target.getRange(startRow, 1, importedRows.length, width).setValues(importedRows);
+  normalizePublicationStatusesForRows_(startRow, startRow + importedRows.length - 1);
+
+  return {
+    imported: importedRows.length,
+    startRow: startRow,
+    endRow: startRow + importedRows.length - 1,
+    message: importedRows.length + ' ligne(s) importee(s) dans "Image Lab", de la ligne ' + startRow + ' a la ligne ' + (startRow + importedRows.length - 1) + '.\nLes formats et mises en forme conditionnelles n ont pas ete modifies.',
+  };
+}
+
+function buildQuarterlyHeaderMap_(headers) {
+  const map = {};
+
+  headers.forEach(function(header, index) {
+    const key = normalizeQuarterlyHeader_(header);
+    if (key) map[key] = index;
+  });
+
+  return map;
+}
+
+function normalizeQuarterlyHeader_(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function getQuarterlyCell_(rowValues, headerMap, names) {
+  for (let i = 0; i < names.length; i += 1) {
+    const index = headerMap[normalizeQuarterlyHeader_(names[i])];
+    if (index !== undefined) return rowValues[index];
+  }
+
+  return '';
+}
+
+function buildImageLabRowFromQuarterlyRow_(rowValues, headerMap) {
+  const width = Math.max(QOORYA_CONFIG.COLUMNS.NOTES, QOORYA_CONFIG.COLUMNS.STATUT);
+  const row = new Array(width).fill('');
+  const type = normalizeQuarterlyPublicationType_(getQuarterlyCell_(rowValues, headerMap, ['Type de publication', 'Type']));
+  const nbSlides = getQuarterlyCell_(rowValues, headerMap, ['Nb slides', 'Nombre de slides']);
+  const intention = String(getQuarterlyCell_(rowValues, headerMap, ['Intention de legende', 'Intention de la legende']) || '').trim();
+  const notes = String(getQuarterlyCell_(rowValues, headerMap, ['Notes / contraintes', 'Notes', 'Contraintes']) || '').trim();
+
+  row[QOORYA_CONFIG.COLUMNS.DATE - 1] = getQuarterlyCell_(rowValues, headerMap, ['Date de publication', 'Date']);
+  row[QOORYA_CONFIG.COLUMNS.TYPE_PUBLICATION - 1] = type;
+  row[QOORYA_CONFIG.COLUMNS.DIRECTION_VISUELLE - 1] = String(getQuarterlyCell_(rowValues, headerMap, ['Direction visuelle']) || 'Libre').trim() || 'Libre';
+  row[QOORYA_CONFIG.COLUMNS.SUJET - 1] = getQuarterlyCell_(rowValues, headerMap, ['Sujet']);
+  row[QOORYA_CONFIG.COLUMNS.ANGLE_EDITORIAL - 1] = getQuarterlyCell_(rowValues, headerMap, ['Angle editorial', 'Angle éditorial']);
+  row[QOORYA_CONFIG.COLUMNS.MISE_EN_SCENE - 1] = getQuarterlyCell_(rowValues, headerMap, ['Mise en scene des visuels', 'Mise en scène des visuels']);
+  row[QOORYA_CONFIG.COLUMNS.NB_SLIDES - 1] = Number(nbSlides || 0) || (type === 'Carrousel' ? 3 : 1);
+  row[QOORYA_CONFIG.COLUMNS.STATUT - 1] = 'TODO';
+  row[QOORYA_CONFIG.COLUMNS.NOTES - 1] = [intention ? 'Intention de legende : ' + intention : '', notes ? 'Notes / contraintes : ' + notes : ''].filter(Boolean).join('\n');
+
+  return row;
+}
+
+function normalizeQuarterlyPublicationType_(value) {
+  const normalized = normalizeWorkflowStatus_(value);
+
+  if (normalized.indexOf('carrousel') !== -1 || normalized.indexOf('carousel') !== -1) {
+    return 'Carrousel';
+  }
+
+  if (normalized.indexOf('post') !== -1) {
+    return 'Post simple';
+  }
+
+  return String(value || '').trim();
+}
+
+function validateQuarterlyImportRow_(row, sourceRow) {
+  const c = QOORYA_CONFIG.COLUMNS;
+  const issues = [];
+  const prefix = 'Ligne ' + sourceRow + ' : ';
+
+  if (!row[c.DATE - 1]) issues.push(prefix + 'Date de publication manquante.');
+  if (!row[c.SUJET - 1]) issues.push(prefix + 'Sujet manquant.');
+  if (!row[c.TYPE_PUBLICATION - 1]) issues.push(prefix + 'Type de publication manquant.');
+  if (!row[c.MISE_EN_SCENE - 1]) issues.push(prefix + 'Mise en scene des visuels manquante.');
+
+  if (row[c.TYPE_PUBLICATION - 1] !== 'Post simple' && row[c.TYPE_PUBLICATION - 1] !== 'Carrousel') {
+    issues.push(prefix + 'Type de publication doit etre "Post simple" ou "Carrousel 3 slides".');
+  }
+
+  return issues;
+}
+
+function isQuarterlyImportRowBlank_(rowValues) {
+  return rowValues.every(function(value) {
+    return String(value || '').trim() === '';
+  });
+}
+
+function findFirstWritableImageLabRow_(sheet) {
+  const c = QOORYA_CONFIG.COLUMNS;
+  const lastRow = Math.max(sheet.getLastRow(), QOORYA_QUARTERLY.LAB_FIRST_DATA_ROW);
+  const width = Math.max(c.DATE, c.TYPE_PUBLICATION, c.SUJET, c.MISE_EN_SCENE, c.LIENS_VISUELS_DRIVE, c.STATUT, c.INSTAGRAM_URL || 0);
+  const values = sheet.getRange(QOORYA_QUARTERLY.LAB_FIRST_DATA_ROW, 1, lastRow - QOORYA_QUARTERLY.LAB_FIRST_DATA_ROW + 1, width).getValues();
+
+  for (let i = values.length - 1; i >= 0; i -= 1) {
+    if (!isQuarterlyImportRowBlank_(values[i])) {
+      return QOORYA_QUARTERLY.LAB_FIRST_DATA_ROW + i + 1;
+    }
+  }
+
+  return QOORYA_QUARTERLY.LAB_FIRST_DATA_ROW;
+}
+
+function createQuarterlyWorkflowDocument() {
+  const result = createQuarterlyWorkflowDocument_();
+
+  SpreadsheetApp.getUi().alert(
+    'Document workflow trimestriel',
+    result.message,
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+
+  return result.url;
+}
+
+function createQuarterlyWorkflowDocument_() {
+  const doc = DocumentApp.create(QOORYA_QUARTERLY.DOC_TITLE);
+  const body = doc.getBody();
+
+  body.clear();
+  appendQuarterlyWorkflowDocumentContent_(body);
+  doc.saveAndClose();
+
+  const folder = findQuarterlyDriveFolder_();
+  const file = DriveApp.getFileById(doc.getId());
+
+  if (folder) {
+    file.moveTo(folder);
+  }
+
+  return {
+    url: doc.getUrl(),
+    message: 'Document cree : ' + doc.getUrl() + (folder ? '\nPlace dans le dossier Drive "' + QOORYA_QUARTERLY.DRIVE_FOLDER_NAME + '".' : '\nDossier cible non trouve automatiquement : document cree dans Mon Drive.'),
+  };
+}
+
+function appendQuarterlyWorkflowDocumentContent_(body) {
+  body.appendParagraph('QOORYA_IMAGE_LAB - Mode d emploi et programmation trimestrielle').setHeading(DocumentApp.ParagraphHeading.TITLE);
+  body.appendParagraph('Objectif').setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  body.appendParagraph('Ce document decrit le workflow pour preparer environ 24 publications Instagram par trimestre, les importer dans QOORYA_IMAGE_LAB, generer les visuels, captions et hashtags, puis publier automatiquement selon la colonne Date.');
+
+  body.appendParagraph('Role de Pierre').setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  [
+    'Definir ou valider les 24 sujets trimestriels.',
+    'Faire produire par ChatGPT les mises en scene des visuels dans le modele attendu.',
+    'Relire le tableau dans l onglet Programmation trimestre avant import.',
+    'Controler les premieres generations et corriger les contenus sensibles.',
+    'Garder la main sur le calendrier via la colonne Date.',
+  ].forEach(function(item) {
+    body.appendListItem(item).setGlyphType(DocumentApp.GlyphType.BULLET);
+  });
+
+  body.appendParagraph('Onglet Programmation trimestre').setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  body.appendParagraph('Coller les donnees produites par ChatGPT dans l onglet Programmation trimestre, a partir de la ligne 2. La ligne 1 contient les en-tetes a conserver.');
+  body.appendParagraph(QOORYA_QUARTERLY.HEADERS.join(' | '));
+
+  body.appendParagraph('Modele de prompt pour ChatGPT').setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  body.appendParagraph('Tu vas preparer un tableau de 24 publications Instagram trimestrielles pour QOORYA. Remplis exactement les colonnes suivantes : Date de publication | Sujet | Angle editorial | Type de publication | Mise en scene des visuels | Direction visuelle | Nb slides | Intention de legende | Notes / contraintes. Utilise le format de date JJ/MM/AAAA. Dans Type de publication, choisis uniquement Post simple ou Carrousel 3 slides. Pour un carrousel, structure la mise en scene avec Slide 1, Slide 2 et Slide 3. Pour un post simple, commence par Visuel unique.');
+
+  body.appendParagraph('Import vers Image Lab').setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  [
+    'Menu QOORYA Image Lab > Creer onglet programmation trimestre si l onglet n existe pas.',
+    'Coller et verifier les 24 lignes dans Programmation trimestre.',
+    'Menu QOORYA Image Lab > Importer programmation trimestre.',
+    'Le script ajoute les lignes apres la derniere ligne utile de Image Lab.',
+    'Le script ecrit uniquement les valeurs, sans supprimer de lignes et sans modifier la mise en forme conditionnelle.',
+    'Les nouvelles lignes commencent en TODO.',
+  ].forEach(function(item) {
+    body.appendListItem(item).setGlyphType(DocumentApp.GlyphType.NUMBER);
+  });
+
+  body.appendParagraph('Pipeline apres import').setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  [
+    'Generation image ou carrousel depuis le Lab.',
+    'Generation caption et hashtags.',
+    'Upload Cloudinary.',
+    'Publication Instagram.',
+    'Le declencheur autonome publie une seule ligne par jour, seulement si la Date est aujourd hui ou passee.',
+    'Avant chaque passage autonome, les statuts sont normalises depuis la ligne 7 jusqu a la derniere ligne utilisee.',
+  ].forEach(function(item) {
+    body.appendListItem(item).setGlyphType(DocumentApp.GlyphType.BULLET);
+  });
+
+  body.appendParagraph('Regle de prudence').setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  body.appendParagraph('Ne pas supprimer les lignes du Lab principal pour preparer un trimestre. Utiliser l import en valeurs seules afin de conserver les formats, validations, filtres et mises en forme conditionnelles.');
+}
+
+function findQuarterlyDriveFolder_() {
+  const parentFolders = DriveApp.getFoldersByName(QOORYA_QUARTERLY.DRIVE_PARENT_FOLDER_NAME);
+
+  while (parentFolders.hasNext()) {
+    const parent = parentFolders.next();
+    const folders = parent.getFoldersByName(QOORYA_QUARTERLY.DRIVE_FOLDER_NAME);
+    if (folders.hasNext()) return folders.next();
+  }
+
+  const fallbackFolders = DriveApp.getFoldersByName(QOORYA_QUARTERLY.DRIVE_FOLDER_NAME);
+  return fallbackFolders.hasNext() ? fallbackFolders.next() : null;
 }

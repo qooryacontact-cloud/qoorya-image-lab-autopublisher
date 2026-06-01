@@ -210,6 +210,25 @@ Regle appliquee :
 - une ligne est candidate si son statut est `DONE Post simple`, `DONE carrousel`, `DONE_CAROUSEL`, `READY TO PUBLISH` ou `READY FOR INSTAGRAM` ;
 - la colonne `Date` doit etre aujourd'hui ou deja passee ;
 - les dates futures sont ignorees ;
+
+## Programmation trimestrielle
+
+Workflow recommande tous les trois mois :
+
+1. Produire ou faire produire par ChatGPT un tableau de 24 publications.
+2. Coller le tableau dans l'onglet `Programmation trimestre`, a partir de la ligne 2.
+3. Relire et valider les sujets, dates, types et mises en scene.
+4. Lancer `QOORYA Image Lab > Importer programmation trimestre`.
+5. Verifier les nouvelles lignes ajoutees dans `Image Lab`.
+6. Laisser le pipeline generer les visuels, captions, hashtags, Cloudinary, puis publier selon la colonne `Date`.
+
+Colonnes attendues dans `Programmation trimestre` :
+
+```text
+Date de publication | Sujet | Angle editorial | Type de publication | Mise en scene des visuels | Direction visuelle | Nb slides | Intention de legende | Notes / contraintes
+```
+
+L'import est volontairement conservateur : il ecrit seulement les valeurs dans `Image Lab`, apres la derniere ligne utile, et conserve la structure de la feuille principale.
 - une seule ligne est traitee par execution.
 
 Proprietes utiles :
