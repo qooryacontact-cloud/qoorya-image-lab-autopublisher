@@ -206,6 +206,7 @@ Le declencheur automatique ne doit pas publier toutes les lignes disponibles.
 
 Regle appliquee :
 
+- avant chaque recherche de ligne a publier, le script normalise les statuts des lignes 7 a 50 ;
 - une ligne est candidate si son statut est `DONE Post simple`, `DONE carrousel`, `DONE_CAROUSEL`, `READY TO PUBLISH` ou `READY FOR INSTAGRAM` ;
 - la colonne `Date` doit etre aujourd'hui ou deja passee ;
 - les dates futures sont ignorees ;

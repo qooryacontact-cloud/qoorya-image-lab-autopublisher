@@ -1962,6 +1962,9 @@ function runAutonomousPipelineByNumber() {
 
 function runNextAutonomousPipelineStep() {
   const sheet = getImageLabSheet_();
+
+  normalizePublicationStatusesForRows_(7, 50);
+
   const row = findNextAutonomousPipelineRow_(sheet);
 
   if (!row) {
@@ -2242,6 +2245,7 @@ function getAutonomousPublishingBetaStatus_() {
     'Installation declencheur autorisee : ' + (triggerInstallAllowed ? 'OUI' : 'NON'),
     'Declencheurs runNextAutonomousPipelineStep installes : ' + autonomousTriggers.length,
     'Heure du declencheur quotidien : ' + triggerHour + 'h',
+    'Normalisation automatique avant publication : lignes 7-50',
     'Prochaine ligne eligible avec date echue : ' + (nextDueRow || 'aucune'),
     '',
     'Regle automatique : publier seulement les lignes eligibles dont la Date est aujourd hui ou passee.'
