@@ -111,4 +111,18 @@ Publication autonome effective seulement si :
 AUTONOMOUS_PUBLISHING_ENABLED = YES
 ```
 
+Declencheur automatique installable seulement si :
+
+```text
+AUTONOMOUS_TRIGGER_INSTALL_ALLOWED = YES
+```
+
+Heure quotidienne optionnelle :
+
+```text
+AUTONOMOUS_TRIGGER_HOUR = 9
+```
+
+Le declencheur automatique execute `runNextAutonomousPipelineStep` une fois par jour et ne traite que la premiere ligne eligible dont la colonne `Date` est aujourd'hui ou deja passee.
+
 Rythme beta recommande avant declencheur : 2 publications par semaine, avec selection humaine des lignes eligibles et controle manuel de la Sheet avant activation.

@@ -1962,7 +1962,7 @@ function runNextAutonomousPipelineStep() {
   const row = findNextAutonomousPipelineRow_(sheet);
 
   if (!row) {
-    Logger.log('Aucune ligne eligible pour le pipeline autonome.');
+    Logger.log('Aucune ligne eligible avec date de publication echue pour le pipeline autonome.');
     return;
   }
 
@@ -2094,21 +2094,64 @@ function findNextAutonomousPipelineRow_(sheet) {
 
   if (lastRow < 2) return null;
 
-  const statuses = sheet.getRange(2, c.STATUT, lastRow - 1, 1).getValues();
+  const width = Math.max(c.DATE, c.STATUT);
+  const rows = sheet.getRange(2, 1, lastRow - 1, width).getValues();
 
-  for (let i = 0; i < statuses.length; i += 1) {
-    const status = String(statuses[i][0] || '').trim();
+  for (let i = 0; i < rows.length; i += 1) {
+    const publicationDate = rows[i][c.DATE - 1];
+    const status = String(rows[i][c.STATUT - 1] || '').trim();
 
     if (
-      isDoneCreativeStatus_(status) ||
-      status === getQOORYAStatus_('READY_TO_PUBLISH', 'READY TO PUBLISH') ||
-      status === getQOORYAStatus_('READY_FOR_INSTAGRAM', 'READY FOR INSTAGRAM')
+      isAutonomousPipelineCandidateStatus_(status) &&
+      isPublicationDateDue_(publicationDate)
     ) {
       return i + 2;
     }
   }
 
   return null;
+}
+
+function isAutonomousPipelineCandidateStatus_(status) {
+  return (
+    isDoneCreativeStatus_(status) ||
+    status === getQOORYAStatus_('READY_TO_PUBLISH', 'READY TO PUBLISH') ||
+    status === getQOORYAStatus_('READY_FOR_INSTAGRAM', 'READY FOR INSTAGRAM')
+  );
+}
+
+function isPublicationDateDue_(value) {
+  const date = parsePublicationDate_(value);
+
+  if (!date) return false;
+
+  const timeZone = Session.getScriptTimeZone() || 'Europe/Paris';
+  const todayKey = Utilities.formatDate(new Date(), timeZone, 'yyyyMMdd');
+  const publicationKey = Utilities.formatDate(date, timeZone, 'yyyyMMdd');
+
+  return publicationKey <= todayKey;
+}
+
+function parsePublicationDate_(value) {
+  if (Object.prototype.toString.call(value) === '[object Date]' && !isNaN(value.getTime())) {
+    return value;
+  }
+
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+
+  let match = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (match) {
+    return new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]));
+  }
+
+  match = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (match) {
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  }
+
+  const parsed = new Date(raw);
+  return isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function isDoneCreativeStatus_(status) {
@@ -2145,12 +2188,16 @@ function installAutonomousPipelineTrigger() {
 
   stopAutonomousPipelineTrigger();
 
+  const triggerHour = getAutonomousPipelineTriggerHour_();
+
   ScriptApp.newTrigger('runNextAutonomousPipelineStep')
     .timeBased()
-    .everyMinutes(15)
+    .atHour(triggerHour)
+    .nearMinute(0)
+    .everyDays(1)
     .create();
 
-  ui.alert('Declencheur installe : pipeline autonome toutes les 15 minutes.');
+  ui.alert('Declencheur installe : pipeline autonome quotidien vers ' + triggerHour + 'h.');
 }
 
 function stopAutonomousPipelineTrigger() {
@@ -2180,16 +2227,29 @@ function diagnoseAutonomousPublishingBetaStatus() {
 function getAutonomousPublishingBetaStatus_() {
   const publishEnabled = getOptionalScriptProperty_('AUTONOMOUS_PUBLISHING_ENABLED') === 'YES';
   const triggerInstallAllowed = getOptionalScriptProperty_('AUTONOMOUS_TRIGGER_INSTALL_ALLOWED') === 'YES';
+  const triggerHour = getAutonomousPipelineTriggerHour_();
   const triggers = ScriptApp.getProjectTriggers();
   const autonomousTriggers = triggers.filter(function(trigger) {
     return trigger.getHandlerFunction() === 'runNextAutonomousPipelineStep';
   });
+  const nextDueRow = findNextAutonomousPipelineRow_(getImageLabSheet_());
 
   return [
     'Publication autonome : ' + (publishEnabled ? 'ACTIVE' : 'DESACTIVEE'),
     'Installation declencheur autorisee : ' + (triggerInstallAllowed ? 'OUI' : 'NON'),
     'Declencheurs runNextAutonomousPipelineStep installes : ' + autonomousTriggers.length,
+    'Heure du declencheur quotidien : ' + triggerHour + 'h',
+    'Prochaine ligne eligible avec date echue : ' + (nextDueRow || 'aucune'),
     '',
-    'Mode beta recommande : publication manuelle par numero de ligne, sans declencheur automatique.'
+    'Regle automatique : publier seulement les lignes eligibles dont la Date est aujourd hui ou passee.'
   ].join('\n');
+}
+
+function getAutonomousPipelineTriggerHour_() {
+  const raw = getOptionalScriptProperty_('AUTONOMOUS_TRIGGER_HOUR');
+  const hour = Number(raw || 9);
+
+  if (!isFinite(hour) || hour < 0 || hour > 23) return 9;
+
+  return Math.floor(hour);
 }
