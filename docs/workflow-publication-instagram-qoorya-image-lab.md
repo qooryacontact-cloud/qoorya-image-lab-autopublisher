@@ -229,6 +229,25 @@ Date de publication | Sujet | Angle editorial | Type de publication | Mise en sc
 ```
 
 L'import est volontairement conservateur : il ecrit seulement les valeurs dans `Image Lab`, apres la derniere ligne utile, et conserve la structure de la feuille principale.
+
+### Import automatique depuis l'onglet trimestre
+
+Le menu `QOORYA Image Lab > Installer declencheur import trimestre` installe un scan quotidien de l'onglet `Programmation trimestre`.
+
+Regle appliquee :
+
+- une ligne deja marquee `IMPORTED` ou avec une `Ligne Image Lab` est ignoree ;
+- une ligne non importee est chargee dans `Image Lab` si sa date est au plus tard dans la fenetre d'anticipation ;
+- la fenetre d'anticipation par defaut est de 14 jours ;
+- les lignes importees sont marquees avec `Statut import`, `Ligne Image Lab` et `Date import` ;
+- l'import automatique n'ecrit que les valeurs et ne modifie pas la mise en forme conditionnelle.
+
+Proprietes optionnelles :
+
+```text
+QUARTERLY_IMPORT_LEAD_DAYS = 14
+QUARTERLY_IMPORT_TRIGGER_HOUR = 8
+```
 - une seule ligne est traitee par execution.
 
 Proprietes utiles :

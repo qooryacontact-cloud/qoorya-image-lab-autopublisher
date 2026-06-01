@@ -24,6 +24,9 @@ const QOORYA_CONFIG = {
 const QOORYA_QUARTERLY = {
   SHEET_NAME: 'Programmation trimestre',
   LAB_FIRST_DATA_ROW: 7,
+  IMPORT_HANDLER: 'runQuarterlyProgrammingImportAutomation',
+  IMPORT_LEAD_DAYS_PROPERTY: 'QUARTERLY_IMPORT_LEAD_DAYS',
+  IMPORT_TRIGGER_HOUR_PROPERTY: 'QUARTERLY_IMPORT_TRIGGER_HOUR',
   DOC_TITLE: 'QOORYA_IMAGE_LAB - Mode d emploi et programmation trimestrielle',
   DRIVE_PARENT_FOLDER_NAME: 'qoorya com',
   DRIVE_FOLDER_NAME: 'Insta',
@@ -37,6 +40,9 @@ const QOORYA_QUARTERLY = {
     'Nb slides',
     'Intention de legende',
     'Notes / contraintes',
+    'Statut import',
+    'Ligne Image Lab',
+    'Date import',
   ],
 };
 
@@ -113,6 +119,9 @@ function onOpen() {
     .addItem('Installer workflow trimestriel', 'setupQuarterlyWorkflow')
     .addItem('Creer onglet programmation trimestre', 'setupQuarterlyProgrammingSheet')
     .addItem('Importer programmation trimestre', 'importQuarterlyProgramming')
+    .addItem('Diagnostiquer import trimestre', 'showQuarterlyImportAutomationStatus')
+    .addItem('Installer declencheur import trimestre', 'installQuarterlyImportTrigger')
+    .addItem('Arreter declencheur import trimestre', 'stopQuarterlyImportTrigger')
     .addItem('Creer doc workflow trimestriel', 'createQuarterlyWorkflowDocument')
     .addToUi();
 }
@@ -2438,6 +2447,16 @@ function importQuarterlyProgramming() {
 }
 
 function importQuarterlyProgramming_() {
+  return importQuarterlyProgrammingByDateWindow_(null);
+}
+
+function runQuarterlyProgrammingImportAutomation() {
+  const result = importQuarterlyProgrammingByDateWindow_(getQuarterlyImportLeadDays_());
+  Logger.log(result.message);
+  return result.message;
+}
+
+function importQuarterlyProgrammingByDateWindow_(leadDays) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const source = ss.getSheetByName(QOORYA_QUARTERLY.SHEET_NAME);
   const target = getImageLabSheet_();
@@ -2456,13 +2475,18 @@ function importQuarterlyProgramming_() {
   const values = source.getRange(1, 1, lastRow, lastColumn).getValues();
   const headerMap = buildQuarterlyHeaderMap_(values[0]);
   const importedRows = [];
+  const sourceRows = [];
   const issues = [];
 
   values.slice(1).forEach(function(rowValues, index) {
     const sourceRow = index + 2;
     if (isQuarterlyImportRowBlank_(rowValues)) return;
+    if (isQuarterlyRowAlreadyImported_(rowValues, headerMap)) return;
 
     const row = buildImageLabRowFromQuarterlyRow_(rowValues, headerMap);
+
+    if (!isQuarterlyRowDueForImport_(row, leadDays)) return;
+
     const rowIssues = validateQuarterlyImportRow_(row, sourceRow);
 
     if (rowIssues.length) {
@@ -2471,6 +2495,7 @@ function importQuarterlyProgramming_() {
     }
 
     importedRows.push(row);
+    sourceRows.push(sourceRow);
   });
 
   if (issues.length) {
@@ -2478,7 +2503,14 @@ function importQuarterlyProgramming_() {
   }
 
   if (!importedRows.length) {
-    throw new Error('Aucune ligne complete a importer.');
+    return {
+      imported: 0,
+      startRow: null,
+      endRow: null,
+      message: leadDays === null
+        ? 'Aucune nouvelle ligne complete a importer.'
+        : 'Aucune nouvelle ligne a importer dans la fenetre des ' + leadDays + ' prochains jours.',
+    };
   }
 
   const startRow = findFirstWritableImageLabRow_(target);
@@ -2487,6 +2519,7 @@ function importQuarterlyProgramming_() {
   target.getRange(startRow, 1, importedRows.length, width).clearContent();
   target.getRange(startRow, 1, importedRows.length, width).setValues(importedRows);
   normalizePublicationStatusesForRows_(startRow, startRow + importedRows.length - 1);
+  markQuarterlyRowsImported_(source, headerMap, sourceRows, startRow);
 
   return {
     imported: importedRows.length,
@@ -2494,6 +2527,176 @@ function importQuarterlyProgramming_() {
     endRow: startRow + importedRows.length - 1,
     message: importedRows.length + ' ligne(s) importee(s) dans "Image Lab", de la ligne ' + startRow + ' a la ligne ' + (startRow + importedRows.length - 1) + '.\nLes formats et mises en forme conditionnelles n ont pas ete modifies.',
   };
+}
+
+function isQuarterlyRowAlreadyImported_(rowValues, headerMap) {
+  const status = String(getQuarterlyCell_(rowValues, headerMap, ['Statut import']) || '').trim().toUpperCase();
+  const targetRow = String(getQuarterlyCell_(rowValues, headerMap, ['Ligne Image Lab']) || '').trim();
+
+  return status === 'IMPORTED' || targetRow !== '';
+}
+
+function isQuarterlyRowDueForImport_(imageLabRow, leadDays) {
+  if (leadDays === null || leadDays === undefined) return true;
+
+  const publicationDate = parsePublicationDate_(imageLabRow[QOORYA_CONFIG.COLUMNS.DATE - 1]);
+  if (!publicationDate) return false;
+
+  const timeZone = Session.getScriptTimeZone() || 'Europe/Paris';
+  const today = new Date();
+  const limit = new Date(today.getTime());
+  limit.setDate(limit.getDate() + Number(leadDays || 0));
+  const limitKey = Utilities.formatDate(limit, timeZone, 'yyyyMMdd');
+  const publicationKey = Utilities.formatDate(publicationDate, timeZone, 'yyyyMMdd');
+
+  return publicationKey <= limitKey;
+}
+
+function markQuarterlyRowsImported_(sheet, headerMap, sourceRows, startRow) {
+  const statusColumn = ensureQuarterlyColumn_(sheet, headerMap, 'Statut import');
+  const targetRowColumn = ensureQuarterlyColumn_(sheet, headerMap, 'Ligne Image Lab');
+  const importedAtColumn = ensureQuarterlyColumn_(sheet, headerMap, 'Date import');
+  const now = new Date();
+
+  sourceRows.forEach(function(sourceRow, index) {
+    sheet.getRange(sourceRow, statusColumn).setValue('IMPORTED');
+    sheet.getRange(sourceRow, targetRowColumn).setValue(startRow + index);
+    sheet.getRange(sourceRow, importedAtColumn).setValue(now);
+  });
+}
+
+function ensureQuarterlyColumn_(sheet, headerMap, headerName) {
+  const key = normalizeQuarterlyHeader_(headerName);
+  const existingIndex = headerMap[key];
+
+  if (existingIndex !== undefined) return existingIndex + 1;
+
+  const column = sheet.getLastColumn() + 1;
+  sheet.getRange(1, column).setValue(headerName);
+  headerMap[key] = column - 1;
+
+  return column;
+}
+
+function installQuarterlyImportTrigger() {
+  stopQuarterlyImportTrigger();
+
+  const triggerHour = getQuarterlyImportTriggerHour_();
+
+  ScriptApp.newTrigger(QOORYA_QUARTERLY.IMPORT_HANDLER)
+    .timeBased()
+    .atHour(triggerHour)
+    .nearMinute(0)
+    .everyDays(1)
+    .create();
+
+  SpreadsheetApp.getUi().alert(
+    'Declencheur import trimestre installe',
+    'Import automatique quotidien vers ' + triggerHour + 'h.\nFenetre d anticipation : ' + getQuarterlyImportLeadDays_() + ' jour(s).',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+function stopQuarterlyImportTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function(trigger) {
+    if (trigger.getHandlerFunction() === QOORYA_QUARTERLY.IMPORT_HANDLER) {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  });
+}
+
+function showQuarterlyImportAutomationStatus() {
+  SpreadsheetApp.getUi().alert(
+    'Import trimestre',
+    getQuarterlyImportAutomationStatus_(),
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+function diagnoseQuarterlyImportAutomationStatus() {
+  const status = getQuarterlyImportAutomationStatus_();
+  Logger.log(status);
+  return status;
+}
+
+function getQuarterlyImportAutomationStatus_() {
+  const triggerHour = getQuarterlyImportTriggerHour_();
+  const leadDays = getQuarterlyImportLeadDays_();
+  const triggers = ScriptApp.getProjectTriggers().filter(function(trigger) {
+    return trigger.getHandlerFunction() === QOORYA_QUARTERLY.IMPORT_HANDLER;
+  });
+  const scan = scanQuarterlyProgrammingRowsForImport_(leadDays);
+
+  return [
+    'Declencheurs ' + QOORYA_QUARTERLY.IMPORT_HANDLER + ' installes : ' + triggers.length,
+    'Heure du declencheur quotidien : ' + triggerHour + 'h',
+    'Fenetre d anticipation : ' + leadDays + ' jour(s)',
+    'Lignes deja importees : ' + scan.imported,
+    'Lignes importables maintenant : ' + scan.due,
+    'Lignes futures hors fenetre : ' + scan.future,
+    'Lignes incompletes ou invalides : ' + scan.invalid,
+    '',
+    'Regle : importer les lignes non importees dont la Date est au plus tard dans ' + leadDays + ' jour(s).'
+  ].join('\n');
+}
+
+function scanQuarterlyProgrammingRowsForImport_(leadDays) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const source = ss.getSheetByName(QOORYA_QUARTERLY.SHEET_NAME);
+  const result = {
+    imported: 0,
+    due: 0,
+    future: 0,
+    invalid: 0,
+  };
+
+  if (!source || source.getLastRow() < 2) return result;
+
+  const values = source.getRange(1, 1, source.getLastRow(), source.getLastColumn()).getValues();
+  const headerMap = buildQuarterlyHeaderMap_(values[0]);
+
+  values.slice(1).forEach(function(rowValues, index) {
+    if (isQuarterlyImportRowBlank_(rowValues)) return;
+    if (isQuarterlyRowAlreadyImported_(rowValues, headerMap)) {
+      result.imported += 1;
+      return;
+    }
+
+    const imageLabRow = buildImageLabRowFromQuarterlyRow_(rowValues, headerMap);
+    const issues = validateQuarterlyImportRow_(imageLabRow, index + 2);
+    const publicationDate = parsePublicationDate_(imageLabRow[QOORYA_CONFIG.COLUMNS.DATE - 1]);
+
+    if (issues.length || !publicationDate) {
+      result.invalid += 1;
+      return;
+    }
+
+    if (isQuarterlyRowDueForImport_(imageLabRow, leadDays)) {
+      result.due += 1;
+    } else {
+      result.future += 1;
+    }
+  });
+
+  return result;
+}
+
+function getQuarterlyImportLeadDays_() {
+  const raw = getOptionalScriptProperty_(QOORYA_QUARTERLY.IMPORT_LEAD_DAYS_PROPERTY);
+  const days = Number(raw || 14);
+
+  if (!isFinite(days) || days < 0 || days > 365) return 14;
+
+  return Math.floor(days);
+}
+
+function getQuarterlyImportTriggerHour_() {
+  const raw = getOptionalScriptProperty_(QOORYA_QUARTERLY.IMPORT_TRIGGER_HOUR_PROPERTY);
+  const hour = Number(raw || 8);
+
+  if (!isFinite(hour) || hour < 0 || hour > 23) return 8;
+
+  return Math.floor(hour);
 }
 
 function buildQuarterlyHeaderMap_(headers) {
@@ -2538,8 +2741,8 @@ function buildImageLabRowFromQuarterlyRow_(rowValues, headerMap) {
   row[QOORYA_CONFIG.COLUMNS.TYPE_PUBLICATION - 1] = type;
   row[QOORYA_CONFIG.COLUMNS.DIRECTION_VISUELLE - 1] = String(getQuarterlyCell_(rowValues, headerMap, ['Direction visuelle']) || 'Libre').trim() || 'Libre';
   row[QOORYA_CONFIG.COLUMNS.SUJET - 1] = getQuarterlyCell_(rowValues, headerMap, ['Sujet']);
-  row[QOORYA_CONFIG.COLUMNS.ANGLE_EDITORIAL - 1] = getQuarterlyCell_(rowValues, headerMap, ['Angle editorial', 'Angle éditorial']);
-  row[QOORYA_CONFIG.COLUMNS.MISE_EN_SCENE - 1] = getQuarterlyCell_(rowValues, headerMap, ['Mise en scene des visuels', 'Mise en scène des visuels']);
+  row[QOORYA_CONFIG.COLUMNS.ANGLE_EDITORIAL - 1] = getQuarterlyCell_(rowValues, headerMap, ['Angle editorial']);
+  row[QOORYA_CONFIG.COLUMNS.MISE_EN_SCENE - 1] = getQuarterlyCell_(rowValues, headerMap, ['Mise en scene des visuels']);
   row[QOORYA_CONFIG.COLUMNS.NB_SLIDES - 1] = Number(nbSlides || 0) || (type === 'Carrousel' ? 3 : 1);
   row[QOORYA_CONFIG.COLUMNS.STATUT - 1] = 'TODO';
   row[QOORYA_CONFIG.COLUMNS.NOTES - 1] = [intention ? 'Intention de legende : ' + intention : '', notes ? 'Notes / contraintes : ' + notes : ''].filter(Boolean).join('\n');
@@ -2653,7 +2856,7 @@ function appendQuarterlyWorkflowDocumentContent_(body) {
   body.appendParagraph(QOORYA_QUARTERLY.HEADERS.join(' | '));
 
   body.appendParagraph('Modele de prompt pour ChatGPT').setHeading(DocumentApp.ParagraphHeading.HEADING1);
-  body.appendParagraph('Tu vas preparer un tableau de 24 publications Instagram trimestrielles pour QOORYA. Remplis exactement les colonnes suivantes : Date de publication | Sujet | Angle editorial | Type de publication | Mise en scene des visuels | Direction visuelle | Nb slides | Intention de legende | Notes / contraintes. Utilise le format de date JJ/MM/AAAA. Dans Type de publication, choisis uniquement Post simple ou Carrousel 3 slides. Pour un carrousel, structure la mise en scene avec Slide 1, Slide 2 et Slide 3. Pour un post simple, commence par Visuel unique.');
+  body.appendParagraph('Tu vas preparer un tableau de 24 publications Instagram trimestrielles pour QOORYA. Remplis exactement les colonnes suivantes : Date de publication | Sujet | Angle editorial | Type de publication | Mise en scene des visuels | Direction visuelle | Nb slides | Intention de legende | Notes / contraintes. Utilise le format de date JJ/MM/AAAA. Dans Type de publication, choisis uniquement Post simple ou Carrousel 3 slides. Pour un carrousel, structure la mise en scene avec Slide 1, Slide 2 et Slide 3. Pour un post simple, commence par Visuel unique. Ne remplis pas les colonnes Statut import, Ligne Image Lab et Date import.');
 
   body.appendParagraph('Import vers Image Lab').setHeading(DocumentApp.ParagraphHeading.HEADING1);
   [
@@ -2662,9 +2865,21 @@ function appendQuarterlyWorkflowDocumentContent_(body) {
     'Menu QOORYA Image Lab > Importer programmation trimestre.',
     'Le script ajoute les lignes apres la derniere ligne utile de Image Lab.',
     'Le script ecrit uniquement les valeurs, sans supprimer de lignes et sans modifier la mise en forme conditionnelle.',
+    'Le script marque les lignes importees dans Programmation trimestre pour eviter les doublons.',
     'Les nouvelles lignes commencent en TODO.',
   ].forEach(function(item) {
     body.appendListItem(item).setGlyphType(DocumentApp.GlyphType.NUMBER);
+  });
+
+  body.appendParagraph('Import automatique').setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  [
+    'Le menu QOORYA Image Lab > Installer declencheur import trimestre installe un scan quotidien.',
+    'Par defaut, le scan importe les lignes non importees dont la Date est au plus tard dans 14 jours.',
+    'La fenetre peut etre modifiee avec la propriete QUARTERLY_IMPORT_LEAD_DAYS.',
+    'L heure quotidienne peut etre modifiee avec QUARTERLY_IMPORT_TRIGGER_HOUR.',
+    'Le menu Diagnostiquer import trimestre indique les lignes deja importees, importables maintenant, futures ou invalides.',
+  ].forEach(function(item) {
+    body.appendListItem(item).setGlyphType(DocumentApp.GlyphType.BULLET);
   });
 
   body.appendParagraph('Pipeline apres import').setHeading(DocumentApp.ParagraphHeading.HEADING1);

@@ -134,12 +134,16 @@ Menu `QOORYA Image Lab` :
 - `Installer workflow trimestriel` cree l'onglet `Programmation trimestre` et le document de mode d'emploi.
 - `Creer onglet programmation trimestre` prepare l'onglet de saisie pour les 24 publications du trimestre.
 - `Importer programmation trimestre` importe les lignes validees vers `Image Lab`.
+- `Diagnostiquer import trimestre` indique combien de lignes sont deja importees, importables maintenant ou futures.
+- `Installer declencheur import trimestre` scanne l'onglet tous les jours et importe automatiquement les lignes dont la date approche.
 - `Creer doc workflow trimestriel` cree le document recapitulatif dans Drive.
 
 L'onglet `Programmation trimestre` attend ces colonnes :
 
 ```text
-Date de publication | Sujet | Angle editorial | Type de publication | Mise en scene des visuels | Direction visuelle | Nb slides | Intention de legende | Notes / contraintes
+Date de publication | Sujet | Angle editorial | Type de publication | Mise en scene des visuels | Direction visuelle | Nb slides | Intention de legende | Notes / contraintes | Statut import | Ligne Image Lab | Date import
 ```
 
 L'import ecrit uniquement les valeurs dans `Image Lab`, apres la derniere ligne utile. Il ne supprime pas de lignes et ne modifie pas les formats, validations ou mises en forme conditionnelles.
+
+L'import automatique utilise par defaut une fenetre de 14 jours avant publication. Elle peut etre modifiee avec la propriete de script `QUARTERLY_IMPORT_LEAD_DAYS`. L'heure quotidienne par defaut est 8h et peut etre modifiee avec `QUARTERLY_IMPORT_TRIGGER_HOUR`.
