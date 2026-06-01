@@ -88,6 +88,8 @@ function onOpen() {
     .addItem('Diagnostiquer securite beta', 'showAutonomousPublishingBetaStatus')
     .addItem('Installer declencheur pipeline autonome', 'installAutonomousPipelineTrigger')
     .addItem('Arreter declencheur pipeline autonome', 'stopAutonomousPipelineTrigger')
+    .addSeparator()
+    .addItem('Normaliser statuts lignes 7-50', 'normalizePublicationStatusesRows7To50')
     .addToUi();
 }
 
@@ -2253,4 +2255,83 @@ function getAutonomousPipelineTriggerHour_() {
   if (!isFinite(hour) || hour < 0 || hour > 23) return 9;
 
   return Math.floor(hour);
+}
+
+function normalizePublicationStatusesRows7To50() {
+  const result = normalizePublicationStatusesForRows_(7, 50);
+
+  SpreadsheetApp.getUi().alert(
+    'Statuts normalises',
+    result.updated + ' ligne(s) mise(s) a jour.\n\n' + result.summary.join('\n'),
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+function normalizePublicationStatusesForRows_(firstRow, lastRow) {
+  const sheet = getImageLabSheet_();
+  const c = getQOORYAPublishingColumns_();
+  const start = Number(firstRow);
+  const end = Number(lastRow);
+  const rowCount = end - start + 1;
+  const width = Math.max(c.TYPE, c.LEGENDE, c.HASHTAGS, c.LIENS_VISUELS_DRIVE, c.STATUT, c.CLOUDINARY_URLS, c.INSTAGRAM_URL);
+  const values = sheet.getRange(start, 1, rowCount, width).getValues();
+  const statuses = [];
+  const counts = {};
+  let updated = 0;
+
+  values.forEach(function(rowValues, index) {
+    const currentStatus = String(rowValues[c.STATUT - 1] || '').trim();
+    const nextStatus = getPublicationStatusForRowState_(rowValues, c);
+
+    statuses.push([nextStatus]);
+    counts[nextStatus] = (counts[nextStatus] || 0) + 1;
+
+    if (currentStatus !== nextStatus) {
+      updated += 1;
+    }
+  });
+
+  sheet.getRange(start, c.STATUT, rowCount, 1).setValues(statuses);
+
+  return {
+    updated: updated,
+    summary: Object.keys(counts).sort().map(function(status) {
+      return status + ' : ' + counts[status];
+    }),
+  };
+}
+
+function getPublicationStatusForRowState_(rowValues, c) {
+  const type = String(rowValues[c.TYPE - 1] || '').trim().toLowerCase();
+  const caption = String(rowValues[c.LEGENDE - 1] || '').trim();
+  const hashtags = String(rowValues[c.HASHTAGS - 1] || '').trim();
+  const driveLinks = String(rowValues[c.LIENS_VISUELS_DRIVE - 1] || '').trim();
+  const cloudinaryLinks = String(rowValues[c.CLOUDINARY_URLS - 1] || '').trim();
+  const instagramLink = String(rowValues[c.INSTAGRAM_URL - 1] || '').trim();
+
+  if (instagramLink) {
+    return getQOORYAStatus_('PUBLISHED', 'PUBLISHED');
+  }
+
+  if (!driveLinks) {
+    return 'TODO';
+  }
+
+  if (cloudinaryLinks && caption && hashtags) {
+    return getQOORYAStatus_('READY_FOR_INSTAGRAM', 'READY FOR INSTAGRAM');
+  }
+
+  if (caption && hashtags) {
+    return getQOORYAStatus_('READY_TO_PUBLISH', 'READY TO PUBLISH');
+  }
+
+  if (type.indexOf('carrousel') !== -1 || type.indexOf('carousel') !== -1) {
+    return getQOORYAStatus_('DONE_CAROUSEL', 'DONE carrousel');
+  }
+
+  if (type.indexOf('post') !== -1) {
+    return getQOORYAStatus_('DONE_POST', 'DONE Post simple');
+  }
+
+  return 'TODO';
 }
