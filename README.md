@@ -81,6 +81,47 @@ IG_USER_ID
 GRAPH_VERSION
 ```
 
+### Renouveler le token Instagram / Meta
+
+Le script publie via l'Instagram Graph API sur `https://graph.facebook.com/{GRAPH_VERSION}`. Il faut donc utiliser un token Facebook Graph API long-lived, pas un token `graph.instagram.com`.
+
+App Meta QOORYA :
+
+```text
+APP_ID = 2045107766391334
+```
+
+Procedure :
+
+1. Aller dans Meta for Developers > Graph API Explorer.
+2. Selectionner l'app Meta QOORYA, pas une app par defaut.
+3. Generer un token court avec les permissions :
+   - `instagram_basic`
+   - `instagram_content_publish`
+   - `pages_show_list`
+   - `pages_read_engagement`
+4. Echanger le token court contre un token long avec :
+
+```text
+https://graph.facebook.com/v24.0/oauth/access_token?grant_type=fb_exchange_token&client_id=2045107766391334&client_secret=APP_SECRET&fb_exchange_token=TOKEN_COURT
+```
+
+5. Verifier que la reponse contient :
+
+```text
+token_type = bearer
+expires_in ~= 5180000
+```
+
+`bearer` signifie que toute personne qui possede ce token peut agir avec ses droits. Le token doit rester secret.
+
+`expires_in` est une duree en secondes. Environ `5180000` secondes correspondent a environ 60 jours.
+
+6. Remplacer la propriete Apps Script `ACCESS_TOKEN` par le nouveau token long.
+7. Si une ligne est restee bloquee en `PUBLISHING Instagram` sans URL Instagram, verifier d'abord que le post n'est pas en ligne, puis remettre son statut a `READY FOR INSTAGRAM` et relancer `Publier Instagram par numero de ligne`.
+
+Exemple calendrier : un token renouvele le 27 juin 2026 expire autour du 26 aout 2026. Renouveler par prudence vers le 20 aout 2026.
+
 Activation publication autonome :
 
 ```text

@@ -73,6 +73,56 @@ Definition minimale :
 - date de publication renseignee ;
 - si utile, capture ou preuve de publication archivee.
 
+### Incident : token Instagram expire
+
+Symptome typique :
+
+```text
+Error validating access token: Session has expired
+```
+
+La ligne peut rester bloquee en `PUBLISHING Instagram` sans URL Instagram. Cela signifie que le script a commence l'etape Instagram, mais que Meta a refuse l'appel avant l'ecriture du lien et du statut `PUBLISHED`.
+
+Procedure :
+
+1. Verifier sur Instagram que le post n'est pas deja publie.
+2. Renouveler le token Meta long-lived.
+3. Remplacer la propriete Apps Script `ACCESS_TOKEN`.
+4. Remettre la ligne en `READY FOR INSTAGRAM`.
+5. Relancer `QOORYA Image Lab > Publier Instagram par numero de ligne`.
+
+Renouvellement du token :
+
+```text
+APP_ID = 2045107766391334
+```
+
+Dans Meta Graph API Explorer, selectionner l'app QOORYA et generer un token court avec :
+
+```text
+instagram_basic
+instagram_content_publish
+pages_show_list
+pages_read_engagement
+```
+
+Echanger ensuite le token court contre un token long :
+
+```text
+https://graph.facebook.com/v24.0/oauth/access_token?grant_type=fb_exchange_token&client_id=2045107766391334&client_secret=APP_SECRET&fb_exchange_token=TOKEN_COURT
+```
+
+La reponse doit contenir :
+
+```text
+token_type = bearer
+expires_in ~= 5180000
+```
+
+`bearer` signifie que le token donne acces aux droits accordes a toute personne qui le possede. Il doit rester secret.
+
+`expires_in` est une duree en secondes. Environ `5180000` secondes correspondent a environ 60 jours. Pour un token renouvele le 27 juin 2026, l'expiration tombe autour du 26 aout 2026 ; renouveler par prudence vers le 20 aout 2026.
+
 ## Colonnes minimales
 
 | Colonne | Type recommande | Obligatoire | Role |
