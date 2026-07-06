@@ -176,14 +176,19 @@ Pour une ligne Reel :
 
 ```text
 Type = Reel
-Legende = renseignee
-Hashtags = renseignes
+Sujet = renseigne
+Angle editorial = renseigne
+Mise en scene = optionnelle si le Reel est deja tourne
+Legende = vide si le pipeline doit la generer
+Hashtags = vide si le pipeline doit les generer
 Liens Cloudinary = une seule URL video Cloudinary
 Instagram URL = vide avant publication
 Statut = READY FOR INSTAGRAM
 ```
 
 Ne pas utiliser `READY TO PUBLISH` pour un Reel si l'objectif est de faire uploader la video vers Cloudinary par le script. L'ancien upload Cloudinary integre au script est prevu pour les visuels Drive/images. Pour un Reel, fournir directement l'URL video Cloudinary dans la colonne `Liens Cloudinary`.
+
+Si `Legende` ou `Hashtags` sont vides, le pipeline peut les generer pour un Reel a partir du `Sujet`, de l'`Angle editorial` et, si elle est renseignee, de la `Mise en scene`.
 
 ## Programmation trimestrielle
 

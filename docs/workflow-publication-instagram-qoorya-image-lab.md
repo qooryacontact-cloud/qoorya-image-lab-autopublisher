@@ -73,6 +73,8 @@ Pour un Reel, `READY FOR INSTAGRAM` signifie :
 - la caption et les hashtags sont presents ;
 - la colonne `Instagram URL` est encore vide.
 
+Si la caption ou les hashtags sont vides, le pipeline peut les generer avant publication a partir du `Sujet`, de l'`Angle editorial` et, si elle est renseignee, de la `Mise en scene`.
+
 ### 6. PUBLISHED
 
 Le post a ete publie.
@@ -173,6 +175,8 @@ Checklist courte :
 `Liens visuels Drive` rempli + upload Cloudinary OK + `Liens Cloudinary` rempli = `READY FOR INSTAGRAM`
 
 Pour un Reel, ne pas utiliser `READY TO PUBLISH` pour demander au script d'uploader la video vers Cloudinary. L'URL video Cloudinary doit deja etre presente dans `Liens Cloudinary`, puis la ligne peut passer en `READY FOR INSTAGRAM`.
+
+Pour declencher aussi la generation de legende et hashtags sur un Reel, laisser `Legende` et/ou `Hashtags` vides, renseigner `Sujet` et `Angle editorial`, puis lancer le pipeline. La `Mise en scene` est utile mais optionnelle pour un Reel deja tourne.
 
 ### De `READY FOR INSTAGRAM` a `PUBLISHED`
 

@@ -1238,8 +1238,14 @@ function processCaptionRow_(sheet, row) {
     liensVisuels: values[c.LIENS_VISUELS_DRIVE - 1],
   };
 
-  if (!rowData.sujet || !rowData.angleEditorial || !rowData.miseEnScene) {
-    throw new Error('Sujet, angle editorial ou mise en scene manquant.');
+  const isReel = isReelPublicationType_(rowData.type);
+
+  if (!rowData.sujet || !rowData.angleEditorial || (!isReel && !rowData.miseEnScene)) {
+    throw new Error(
+      isReel
+        ? 'Sujet ou angle editorial manquant pour generer la legende du Reel.'
+        : 'Sujet, angle editorial ou mise en scene manquant.'
+    );
   }
 
   const existingCaption = String(sheet.getRange(row, c.LEGENDE).getValue() || '').trim();
@@ -1263,6 +1269,10 @@ function processCaptionRow_(sheet, row) {
 }
 
 function buildQOORYACaptionPrompt_(rowData) {
+  if (isReelPublicationType_(rowData.type)) {
+    return buildQOORYAReelCaptionPrompt_(rowData);
+  }
+
   return [
     'Redige une legende Instagram finale pour QOORYA.',
     '',
@@ -1285,6 +1295,33 @@ function buildQOORYACaptionPrompt_(rowData) {
     '',
     'Format attendu :',
     '- Une caption Instagram prete a publier.',
+    '- 6 a 8 hashtags maximum, pertinents, sobres, sans inflation.',
+    '- Eviter les hashtags trop generiques ou opportunistes.',
+  ].join('\n');
+}
+
+function buildQOORYAReelCaptionPrompt_(rowData) {
+  return [
+    'Redige une legende Instagram finale pour un Reel QOORYA.',
+    '',
+    'Contexte de la publication :',
+    `Type : ${rowData.type}`,
+    `Sujet : ${rowData.sujet}`,
+    `Angle editorial : ${rowData.angleEditorial}`,
+    `Description ou mise en scene du Reel : ${rowData.miseEnScene || '(Reel deja tourne ; se baser sur le sujet et l angle editorial)'}`,
+    '',
+    'Contraintes editoriales :',
+    '- Ton clair, sobre, utile, non corporate.',
+    '- Ne pas decrire platement la video.',
+    '- Donner envie de regarder le Reel sans faire clickbait.',
+    '- Introduire rapidement le benefice ou la tension du sujet.',
+    '- Ne pas faire de promesse magique sur l IA.',
+    '- Pas de survente, pas de jargon.',
+    '- Finir par un CTA naturel et discret.',
+    '- Texte en francais naturel.',
+    '',
+    'Format attendu :',
+    '- Une caption Instagram prete a publier avec un bon premier paragraphe.',
     '- 6 a 8 hashtags maximum, pertinents, sobres, sans inflation.',
     '- Eviter les hashtags trop generiques ou opportunistes.',
   ].join('\n');
