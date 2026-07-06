@@ -1804,7 +1804,8 @@ function publishRowToInstagram_(sheet, row) {
   SpreadsheetApp.flush();
 
   try {
-    const mediaId = publishCloudinaryUrlsToInstagram_(cloudinaryUrls, caption);
+    const publicationType = String(sheet.getRange(row, c.TYPE).getValue() || '').trim();
+    const mediaId = publishCloudinaryUrlsToInstagram_(cloudinaryUrls, caption, publicationType);
     const permalink = getInstagramPermalink_(mediaId);
 
     sheet.getRange(row, c.INSTAGRAM_URL).setValue(permalink || mediaId);
@@ -1826,7 +1827,17 @@ function publishRowToInstagram_(sheet, row) {
   }
 }
 
-function publishCloudinaryUrlsToInstagram_(urls, caption) {
+function publishCloudinaryUrlsToInstagram_(urls, caption, publicationType) {
+  if (isReelPublicationType_(publicationType)) {
+    if (urls.length !== 1) {
+      throw new Error('Un Reel Instagram doit contenir exactement une URL video Cloudinary.');
+    }
+
+    const container = createInstagramReelContainer_(urls[0], caption);
+    waitForInstagramContainerReady_(container.id);
+    return publishInstagramContainer_(container.id);
+  }
+
   if (urls.length === 1) {
     const container = createInstagramImageContainer_(urls[0], caption, false);
     Utilities.sleep(5000);
@@ -1847,6 +1858,49 @@ function publishCloudinaryUrlsToInstagram_(urls, caption) {
   Utilities.sleep(5000);
 
   return publishInstagramContainer_(parent.id);
+}
+
+function isReelPublicationType_(publicationType) {
+  const normalized = normalizeWorkflowStatus_(publicationType);
+  return normalized === 'reel' || normalized === 'reels' || normalized.indexOf('reel ') === 0;
+}
+
+function createInstagramReelContainer_(videoUrl, caption) {
+  const igUserId = getRequiredScriptProperty_('IG_USER_ID');
+
+  return callInstagramGraphPost_(igUserId + '/media', {
+    media_type: 'REELS',
+    video_url: videoUrl,
+    caption: caption,
+    access_token: getRequiredScriptProperty_('ACCESS_TOKEN'),
+  });
+}
+
+function waitForInstagramContainerReady_(creationId) {
+  const maxAttempts = 18;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const status = getInstagramContainerStatus_(creationId);
+
+    if (status === 'FINISHED') return;
+
+    if (status === 'ERROR' || status === 'EXPIRED') {
+      throw new Error('Instagram : container Reel non publiable, statut ' + status + '.');
+    }
+
+    Utilities.sleep(10000);
+  }
+
+  throw new Error('Instagram : container Reel pas encore pret apres attente. Relancer la publication plus tard.');
+}
+
+function getInstagramContainerStatus_(creationId) {
+  const result = callInstagramGraphGet_(creationId, {
+    fields: 'status_code',
+    access_token: getRequiredScriptProperty_('ACCESS_TOKEN'),
+  });
+
+  return String(result.status_code || '').trim();
 }
 
 function createInstagramImageContainer_(imageUrl, caption, isCarouselItem) {
@@ -2116,7 +2170,8 @@ function publishRowToInstagramNoUi_(sheet, row) {
   sheet.getRange(row, c.STATUT).setValue(getQOORYAStatus_('PUBLISHING_INSTAGRAM', 'PUBLISHING Instagram'));
   SpreadsheetApp.flush();
 
-  const mediaId = publishCloudinaryUrlsToInstagram_(cloudinaryUrls, caption);
+  const publicationType = String(sheet.getRange(row, c.TYPE).getValue() || '').trim();
+  const mediaId = publishCloudinaryUrlsToInstagram_(cloudinaryUrls, caption, publicationType);
   const permalink = getInstagramPermalink_(mediaId);
 
   sheet.getRange(row, c.INSTAGRAM_URL).setValue(permalink || mediaId);
@@ -2363,17 +2418,18 @@ function getPublicationStatusForRowState_(rowValues, c) {
   const driveLinks = String(rowValues[c.LIENS_VISUELS_DRIVE - 1] || '').trim();
   const cloudinaryLinks = String(rowValues[c.CLOUDINARY_URLS - 1] || '').trim();
   const instagramLink = String(rowValues[c.INSTAGRAM_URL - 1] || '').trim();
+  const isReel = isReelPublicationType_(type);
 
   if (instagramLink) {
     return getQOORYAStatus_('PUBLISHED', 'PUBLISHED');
   }
 
-  if (!driveLinks) {
-    return 'TODO';
-  }
-
   if (cloudinaryLinks && caption && hashtags) {
     return getQOORYAStatus_('READY_FOR_INSTAGRAM', 'READY FOR INSTAGRAM');
+  }
+
+  if (!driveLinks || isReel) {
+    return 'TODO';
   }
 
   if (caption && hashtags) {

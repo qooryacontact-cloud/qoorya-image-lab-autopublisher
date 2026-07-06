@@ -14,6 +14,10 @@ Le workflow beta valide est maintenant :
 
 `DONE Post simple / DONE carrousel` -> `caption + hashtags` -> `READY TO PUBLISH` -> `Liens Cloudinary` -> `READY FOR INSTAGRAM` -> `PUBLISHED`
 
+Pour les Reels, le workflow part d'une URL video Cloudinary deja presente :
+
+`Reel + caption + hashtags + URL Cloudinary video` -> `READY FOR INSTAGRAM` -> `PUBLISHED`
+
 ## Statuts
 
 ### 1. IDEA / BACKLOG
@@ -62,6 +66,12 @@ Definition minimale :
 - la colonne `Liens Cloudinary` est remplie ;
 - la caption et les hashtags sont presents ;
 - le contenu a deja ete valide pour publication.
+
+Pour un Reel, `READY FOR INSTAGRAM` signifie :
+- le type de publication est `Reel` ;
+- la colonne `Liens Cloudinary` contient exactement une URL video Cloudinary publique ;
+- la caption et les hashtags sont presents ;
+- la colonne `Instagram URL` est encore vide.
 
 ### 6. PUBLISHED
 
@@ -161,6 +171,8 @@ Passer le statut a `READY FOR INSTAGRAM` quand :
 Checklist courte :
 
 `Liens visuels Drive` rempli + upload Cloudinary OK + `Liens Cloudinary` rempli = `READY FOR INSTAGRAM`
+
+Pour un Reel, ne pas utiliser `READY TO PUBLISH` pour demander au script d'uploader la video vers Cloudinary. L'URL video Cloudinary doit deja etre presente dans `Liens Cloudinary`, puis la ligne peut passer en `READY FOR INSTAGRAM`.
 
 ### De `READY FOR INSTAGRAM` a `PUBLISHED`
 

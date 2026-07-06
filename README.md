@@ -168,6 +168,23 @@ Le declencheur automatique execute `runNextAutonomousPipelineStep` une fois par 
 
 Rythme beta recommande avant declencheur : 2 publications par semaine, avec selection humaine des lignes eligibles et controle manuel de la Sheet avant activation.
 
+## Publication des Reels
+
+Le pipeline prend en charge les Reels si la video est deja disponible via une URL Cloudinary publique.
+
+Pour une ligne Reel :
+
+```text
+Type = Reel
+Legende = renseignee
+Hashtags = renseignes
+Liens Cloudinary = une seule URL video Cloudinary
+Instagram URL = vide avant publication
+Statut = READY FOR INSTAGRAM
+```
+
+Ne pas utiliser `READY TO PUBLISH` pour un Reel si l'objectif est de faire uploader la video vers Cloudinary par le script. L'ancien upload Cloudinary integre au script est prevu pour les visuels Drive/images. Pour un Reel, fournir directement l'URL video Cloudinary dans la colonne `Liens Cloudinary`.
+
 ## Programmation trimestrielle
 
 Menu `QOORYA Image Lab` :
