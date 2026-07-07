@@ -1354,7 +1354,7 @@ function generateQOORYACaptionJson_(prompt) {
     }
   };
 
-  const response = UrlFetchApp.fetch('https://api.openai.com/v1/responses', {
+  const response = fetchOpenAIWithRetry_('https://api.openai.com/v1/responses', {
     method: 'post',
     contentType: 'application/json',
     headers: {
@@ -1362,18 +1362,43 @@ function generateQOORYACaptionJson_(prompt) {
     },
     payload: JSON.stringify(payload),
     muteHttpExceptions: true,
-  });
+  }, 'caption');
 
-  const status = response.getResponseCode();
   const body = response.getContentText();
-
-  if (status < 200 || status >= 300) {
-    throw new Error(`OpenAI caption error ${status}: ${body}`);
-  }
-
   const json = JSON.parse(body);
   const text = extractOpenAIResponseText_(json);
   return JSON.parse(text);
+}
+
+function fetchOpenAIWithRetry_(url, options, label) {
+  const maxAttempts = 3;
+  let lastStatus = 0;
+  let lastBody = '';
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const response = UrlFetchApp.fetch(url, options);
+    const status = response.getResponseCode();
+    const body = response.getContentText();
+
+    if (status >= 200 && status < 300) {
+      return response;
+    }
+
+    lastStatus = status;
+    lastBody = body;
+
+    if (!isRetryableOpenAIStatus_(status) || attempt === maxAttempts) {
+      break;
+    }
+
+    Utilities.sleep(attempt * 5000);
+  }
+
+  throw new Error(`OpenAI ${label} error ${lastStatus}: ${lastBody}`);
+}
+
+function isRetryableOpenAIStatus_(status) {
+  return [429, 500, 502, 503, 504].indexOf(Number(status)) !== -1;
 }
 
 function extractOpenAIResponseText_(json) {
