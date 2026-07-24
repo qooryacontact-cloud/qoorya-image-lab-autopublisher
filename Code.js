@@ -93,7 +93,7 @@ function onOpen() {
     .addItem('Arreter automatisation carrousel', 'stopAutomatedCarouselGeneration')
     .addSeparator()
     .addItem('Diagnostiquer une ligne', 'diagnoseRowByNumber')
-    .addItem('Generer les lignes TODO', 'generateTodoImageRows')
+    .addItem('Traiter les lignes TODO de bout en bout', 'generateTodoImageRows')
     .addSeparator()
     .addItem('Rediger caption ligne active', 'generateCaptionForActiveRow')
     .addItem('Rediger caption par numero de ligne', 'generateCaptionForRowPrompt')
@@ -167,21 +167,75 @@ function generateCarouselRowByNumber() {
 function generateTodoImageRows() {
   const sheet = getImageLabSheet_();
   const lastRow = sheet.getLastRow();
-  let generated = 0;
+  const allowAutonomousPublishing =
+    getOptionalScriptProperty_('AUTONOMOUS_PUBLISHING_ENABLED') === 'YES';
+  let processed = 0;
 
   for (let row = 2; row <= lastRow; row += 1) {
     const status = String(
       sheet.getRange(row, QOORYA_CONFIG.COLUMNS.STATUT).getValue() || ''
     ).trim();
+    const publicationType = sheet
+      .getRange(row, QOORYA_CONFIG.COLUMNS.TYPE_PUBLICATION)
+      .getValue();
 
-    if (status === 'TODO') {
-      processImageRow_(sheet, row);
-      generated += 1;
+    if (
+      status === QOORYA_STATUS.TODO &&
+      isAutomaticallyGeneratedPublicationType_(publicationType)
+    ) {
+      const publicationDate = sheet
+        .getRange(row, QOORYA_CONFIG.COLUMNS.DATE)
+        .getValue();
+      const allowPublish =
+        allowAutonomousPublishing && isPublicationDateDue_(publicationDate);
+
+      Logger.log(runAutonomousPipelineForRow_(sheet, row, allowPublish));
+      processed += 1;
       Utilities.sleep(800);
     }
   }
 
-  SpreadsheetApp.getUi().alert(`${generated} ligne(s) generee(s).`);
+  SpreadsheetApp.getUi().alert(`${processed} ligne(s) TODO traitee(s).`);
+}
+
+function processCreativeRowForType_(sheet, row) {
+  const data = readRowData_(sheet, row);
+
+  if (isCarouselPublicationType_(data.typePublication)) {
+    processCarouselRow_(sheet, row);
+  } else if (isPostPublicationType_(data.typePublication)) {
+    processImageRow_(sheet, row);
+  } else {
+    throw new Error(
+      `Type de publication non pris en charge pour la generation automatique : ${data.typePublication || '(vide)'}.`
+    );
+  }
+
+  const status = String(
+    sheet.getRange(row, QOORYA_CONFIG.COLUMNS.STATUT).getValue() || ''
+  ).trim();
+
+  if (!isDoneCreativeStatus_(status)) {
+    throw new Error(
+      `Generation creative incomplete pour la ligne ${row}. Statut obtenu : ${status || '(vide)'}.`
+    );
+  }
+}
+
+function isCarouselPublicationType_(publicationType) {
+  const normalized = normalizeWorkflowStatus_(publicationType);
+  return normalized.indexOf('carrousel') !== -1 || normalized.indexOf('carousel') !== -1;
+}
+
+function isPostPublicationType_(publicationType) {
+  return normalizeWorkflowStatus_(publicationType).indexOf('post') !== -1;
+}
+
+function isAutomaticallyGeneratedPublicationType_(publicationType) {
+  return (
+    isPostPublicationType_(publicationType) ||
+    isCarouselPublicationType_(publicationType)
+  );
 }
 
 function processImageRow_(sheet, row) {
@@ -1224,9 +1278,10 @@ function generateCaptionForRowPrompt() {
   processCaptionRow_(getImageLabSheet_(), row);
 }
 
-function processCaptionRow_(sheet, row) {
+function processCaptionRow_(sheet, row, options) {
   const c = getQOORYACaptionColumns_();
   const values = sheet.getRange(row, 1, 1, 12).getValues()[0];
+  const preserveExisting = Boolean(options && options.preserveExisting);
 
   const rowData = {
     type: values[c.TYPE - 1],
@@ -1252,20 +1307,30 @@ function processCaptionRow_(sheet, row) {
   const existingHashtags = String(sheet.getRange(row, c.HASHTAGS).getValue() || '').trim();
 
   if (existingCaption || existingHashtags) {
-    const ui = SpreadsheetApp.getUi();
-    const confirm = ui.alert(
-      'Caption deja presente',
-      'Remplacer la legende et les hashtags existants ?',
-      ui.ButtonSet.YES_NO
-    );
-    if (confirm !== ui.Button.YES) return;
+    if (!preserveExisting) {
+      const ui = SpreadsheetApp.getUi();
+      const confirm = ui.alert(
+        'Caption deja presente',
+        'Remplacer la legende et les hashtags existants ?',
+        ui.ButtonSet.YES_NO
+      );
+      if (confirm !== ui.Button.YES) return;
+    }
   }
 
   const prompt = buildQOORYACaptionPrompt_(rowData);
   const result = generateQOORYACaptionJson_(prompt);
 
-  sheet.getRange(row, c.LEGENDE).setValue(result.caption);
-  sheet.getRange(row, c.HASHTAGS).setValue(result.hashtags.join(' '));
+  sheet
+    .getRange(row, c.LEGENDE)
+    .setValue(preserveExisting && existingCaption ? existingCaption : result.caption);
+  sheet
+    .getRange(row, c.HASHTAGS)
+    .setValue(
+      preserveExisting && existingHashtags
+        ? existingHashtags
+        : result.hashtags.join(' ')
+    );
 }
 
 function buildQOORYACaptionPrompt_(rowData) {
@@ -2128,13 +2193,18 @@ function runNextAutonomousPipelineStep() {
 function runAutonomousPipelineForRow_(sheet, row, allowPublish) {
   const c = getQOORYAPublishingColumns_();
 
-  for (let step = 0; step < 6; step += 1) {
+  for (let step = 0; step < 8; step += 1) {
     const status = String(sheet.getRange(row, c.STATUT).getValue() || '').trim();
     const caption = String(sheet.getRange(row, c.LEGENDE).getValue() || '').trim();
     const hashtags = String(sheet.getRange(row, c.HASHTAGS).getValue() || '').trim();
 
+    if (status === getQOORYAStatus_('TODO', 'TODO')) {
+      processCreativeRowForType_(sheet, row);
+      continue;
+    }
+
     if (!caption || !hashtags) {
-      processCaptionRow_(sheet, row);
+      processCaptionRow_(sheet, row, { preserveExisting: true });
       continue;
     }
 
@@ -2250,15 +2320,16 @@ function findNextAutonomousPipelineRow_(sheet) {
 
   if (lastRow < 2) return null;
 
-  const width = Math.max(c.DATE, c.STATUT);
+  const width = Math.max(c.DATE, c.TYPE, c.STATUT);
   const rows = sheet.getRange(2, 1, lastRow - 1, width).getValues();
 
   for (let i = 0; i < rows.length; i += 1) {
     const publicationDate = rows[i][c.DATE - 1];
+    const publicationType = rows[i][c.TYPE - 1];
     const status = String(rows[i][c.STATUT - 1] || '').trim();
 
     if (
-      isAutonomousPipelineCandidateStatus_(status) &&
+      isAutonomousPipelineCandidateStatus_(status, publicationType) &&
       isPublicationDateDue_(publicationDate)
     ) {
       return i + 2;
@@ -2268,8 +2339,12 @@ function findNextAutonomousPipelineRow_(sheet) {
   return null;
 }
 
-function isAutonomousPipelineCandidateStatus_(status) {
+function isAutonomousPipelineCandidateStatus_(status, publicationType) {
   return (
+    (
+      status === getQOORYAStatus_('TODO', 'TODO') &&
+      isAutomaticallyGeneratedPublicationType_(publicationType)
+    ) ||
     isDoneCreativeStatus_(status) ||
     status === getQOORYAStatus_('READY_TO_PUBLISH', 'READY TO PUBLISH') ||
     status === getQOORYAStatus_('READY_FOR_INSTAGRAM', 'READY FOR INSTAGRAM')

@@ -9,7 +9,9 @@ Ce depot ne remplace pas l'ancien projet GitHub `autoInstaPublication`.
 Le pipeline suivant a ete valide :
 
 ```text
-DONE Post simple / DONE carrousel
+TODO (Post simple / Carrousel)
+-> generation automatique du bon format
+-> DONE Post simple / DONE carrousel
 -> caption + hashtags si manquants
 -> READY TO PUBLISH
 -> upload Cloudinary si manquant
@@ -24,6 +26,26 @@ Tests valides :
 - carrousel 3 slides publie avec caption et hashtags ;
 - upload Cloudinary de 5 visuels ;
 - pipeline autonome par numero de ligne.
+
+## Statut TODO de bout en bout
+
+Pour un `Post simple` ou un `Carrousel`, `TODO` est l'etat d'entree unique du
+pipeline autonome. Quand la date de publication est aujourd'hui ou deja passee,
+le declencheur quotidien :
+
+1. choisit le generateur correspondant au type de publication ;
+2. genere l'image unique ou toutes les slides du carrousel ;
+3. complete la legende et les hashtags manquants ;
+4. transfere les visuels Drive vers Cloudinary ;
+5. publie sur Instagram si `AUTONOMOUS_PUBLISHING_ENABLED=YES`.
+
+Pour un carrousel, `Nb slides` doit etre compris entre 3 et 8. Les Reels ne sont
+pas generes depuis `TODO`, car le pipeline attend une video Cloudinary publique.
+
+Le menu `Traiter les lignes TODO de bout en bout` applique le meme pipeline a
+toutes les lignes `TODO` de type Post simple ou Carrousel. Une ligne dont la
+date est future est preparee jusqu'a `READY FOR INSTAGRAM`, puis publiee par le
+declencheur quotidien lorsque sa date arrive.
 
 ## Fichiers
 
