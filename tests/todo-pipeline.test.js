@@ -145,4 +145,68 @@ assert.deepEqual(Array.from(context.__pipelineCalls), [
   'cloudinary',
 ]);
 
+runInContext(`
+  var __instagramCaptionCalls = [];
+  processCaptionRow_ = function(sheet, row, options) {
+    if (!options || !options.preserveExisting) {
+      throw new Error('La preparation Instagram doit conserver les champs existants.');
+    }
+    __instagramCaptionCalls.push(row);
+    var captionRange = sheet.getRange(row, 8);
+    var hashtagsRange = sheet.getRange(row, 9);
+    if (!captionRange.getValue()) captionRange.setValue('Legende Reel generee');
+    if (!hashtagsRange.getValue()) hashtagsRange.setValue('#qoorya #reel');
+  };
+`);
+
+context.__emptyReelCaptionSheet = createPipelineSheet({
+  2: 'Reel',
+  8: '',
+  9: '',
+  11: 'READY FOR INSTAGRAM',
+  13: 'https://cloudinary.example/reel.mp4',
+});
+runInContext(
+  'ensureInstagramCaptionAndHashtags_(__emptyReelCaptionSheet, 25, getQOORYAPublishingColumns_())'
+);
+assert.equal(context.__emptyReelCaptionSheet.values[8], 'Legende Reel generee');
+assert.equal(context.__emptyReelCaptionSheet.values[9], '#qoorya #reel');
+assert.deepEqual(Array.from(context.__instagramCaptionCalls), [25]);
+
+runInContext('__instagramCaptionCalls.length = 0');
+context.__partialReelCaptionSheet = createPipelineSheet({
+  2: 'Reel',
+  8: 'Legende conservee',
+  9: '',
+  11: 'READY FOR INSTAGRAM',
+  13: 'https://cloudinary.example/reel.mp4',
+});
+runInContext(
+  'ensureInstagramCaptionAndHashtags_(__partialReelCaptionSheet, 30, getQOORYAPublishingColumns_())'
+);
+assert.equal(context.__partialReelCaptionSheet.values[8], 'Legende conservee');
+assert.equal(context.__partialReelCaptionSheet.values[9], '#qoorya #reel');
+assert.deepEqual(Array.from(context.__instagramCaptionCalls), [30]);
+
+runInContext('__instagramCaptionCalls.length = 0');
+context.__completeReelCaptionSheet = createPipelineSheet({
+  2: 'Reel',
+  8: 'Legende existante',
+  9: '#existant',
+  11: 'READY FOR INSTAGRAM',
+  13: 'https://cloudinary.example/reel.mp4',
+});
+runInContext(
+  'ensureInstagramCaptionAndHashtags_(__completeReelCaptionSheet, 31, getQOORYAPublishingColumns_())'
+);
+assert.deepEqual(Array.from(context.__instagramCaptionCalls), []);
+
+context.__missingHashtagsSheet = createPipelineSheet({ 8: 'Legende seule', 9: '' });
+assert.throws(
+  () => runInContext(
+    'buildInstagramCaptionFromRow_(__missingHashtagsSheet, 32, getQOORYAPublishingColumns_())'
+  ),
+  /hashtags/
+);
+
 console.log('TODO pipeline tests: OK');

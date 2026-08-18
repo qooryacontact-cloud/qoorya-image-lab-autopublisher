@@ -1925,6 +1925,17 @@ function publishRowToInstagram_(sheet, row) {
     return;
   }
 
+  try {
+    ensureInstagramCaptionAndHashtags_(sheet, row, c);
+  } catch (error) {
+    ui.alert(
+      'Legende Instagram incomplete',
+      String(error && error.message ? error.message : error),
+      ui.ButtonSet.OK
+    );
+    return;
+  }
+
   const caption = buildInstagramCaptionFromRow_(sheet, row, c);
 
   sheet.getRange(row, c.STATUT).setValue(getQOORYAStatus_('PUBLISHING_INSTAGRAM', 'PUBLISHING Instagram'));
@@ -2088,17 +2099,42 @@ function buildInstagramCaptionFromRow_(sheet, row, c) {
   const legende = String(sheet.getRange(row, c.LEGENDE).getValue() || '').trim();
   const hashtags = String(sheet.getRange(row, c.HASHTAGS).getValue() || '').trim();
 
-  const caption = [legende, hashtags].filter(Boolean).join('\n\n').trim();
-
-  if (!caption) {
-    throw new Error('Legende et hashtags manquants.');
+  if (!legende || !hashtags) {
+    const missingFields = [];
+    if (!legende) missingFields.push('legende');
+    if (!hashtags) missingFields.push('hashtags');
+    throw new Error('Champ(s) manquant(s) : ' + missingFields.join(' et ') + '.');
   }
+
+  const caption = [legende, hashtags].join('\n\n').trim();
 
   if (caption.length > 2200) {
     throw new Error('Caption trop longue pour Instagram : ' + caption.length + ' caracteres.');
   }
 
   return caption;
+}
+
+function ensureInstagramCaptionAndHashtags_(sheet, row, c) {
+  const columns = c || getQOORYAPublishingColumns_();
+  let legende = String(sheet.getRange(row, columns.LEGENDE).getValue() || '').trim();
+  let hashtags = String(sheet.getRange(row, columns.HASHTAGS).getValue() || '').trim();
+
+  if (legende && hashtags) return;
+
+  processCaptionRow_(sheet, row, { preserveExisting: true });
+
+  legende = String(sheet.getRange(row, columns.LEGENDE).getValue() || '').trim();
+  hashtags = String(sheet.getRange(row, columns.HASHTAGS).getValue() || '').trim();
+
+  if (!legende || !hashtags) {
+    const missingFields = [];
+    if (!legende) missingFields.push('legende');
+    if (!hashtags) missingFields.push('hashtags');
+    throw new Error(
+      'La generation automatique n a pas renseigne : ' + missingFields.join(' et ') + '.'
+    );
+  }
 }
 
 function callInstagramGraphPost_(path, payload) {
@@ -2297,6 +2333,7 @@ function publishRowToInstagramNoUi_(sheet, row) {
     throw new Error('Liens Cloudinary manquants.');
   }
 
+  ensureInstagramCaptionAndHashtags_(sheet, row, c);
   const caption = buildInstagramCaptionFromRow_(sheet, row, c);
 
   sheet.getRange(row, c.STATUT).setValue(getQOORYAStatus_('PUBLISHING_INSTAGRAM', 'PUBLISHING Instagram'));

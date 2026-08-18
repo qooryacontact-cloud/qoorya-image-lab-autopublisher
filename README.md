@@ -212,6 +212,8 @@ Ne pas utiliser `READY TO PUBLISH` pour un Reel si l'objectif est de faire uploa
 
 Si `Legende` ou `Hashtags` sont vides, le pipeline peut les generer pour un Reel a partir du `Sujet`, de l'`Angle editorial` et, si elle est renseignee, de la `Mise en scene`.
 
+Cette generation automatique s'applique aussi a la commande de publication directe : une ligne Reel en `READY FOR INSTAGRAM` avec son URL video Cloudinary peut etre publiee meme si `Legende` ou `Hashtags` sont encore vides. Le script complete uniquement les champs manquants, conserve les champs deja renseignes, puis verifie que les deux champs sont presents avant l'appel Instagram.
+
 ## Programmation trimestrielle
 
 Menu `QOORYA Image Lab` :
